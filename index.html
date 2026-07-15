@@ -31,6 +31,25 @@ select,input,textarea{background:#091625;border:1px solid #34506f;color:var(--te
 .timer{font-size:3rem;font-weight:850;letter-spacing:2px;text-align:center;margin:15px 0}.timerBtns{display:flex;gap:8px}.timerBtns button{flex:1}
 .achievement{display:flex;gap:10px;align-items:center;padding:11px;border-radius:13px;background:var(--panel2);margin:8px 0}.locked{opacity:.38;filter:grayscale(1)}
 canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{border-left:4px solid var(--yellow);padding:10px 12px;background:#3a2a0a;border-radius:8px;color:#fde68a}
+
+.workoutCard{background:var(--panel);border:1px solid var(--line);border-radius:18px;margin:14px 0;overflow:hidden}
+.workoutHeader{padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;background:linear-gradient(135deg,#11253c,#0e1b2e)}
+.workoutHeader h3{margin:0}.workoutBody{padding:0 16px 16px}.workoutBody.hiddenBody{display:none}
+.workoutTag{font-size:.72rem;padding:5px 8px;border-radius:999px;background:#1b3551;color:#c7d8ea}
+.visual-demo{height:260px;padding:10px;position:relative}
+.visual-demo svg{width:100%;height:100%;display:block}
+.pose-label{font-size:12px;fill:#9db0c8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.pose-body{stroke:#e5eef9;stroke-width:14;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.pose-joint{fill:#e5eef9}.pose-equipment{stroke:#4ade80;stroke-width:10;stroke-linecap:round;fill:none}.pose-floor{stroke:#486581;stroke-width:4}
+.motion-arrow{stroke:#60a5fa;stroke-width:5;fill:none;marker-end:url(#arrow)}
+
+
+.modeRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.modeBanner{margin-top:12px;padding:11px 12px;border-radius:12px;background:#10243a;border:1px solid #294763;color:#c8d8e9;font-size:.84rem}
+.modeSelect{min-width:165px}
+.modePill{display:inline-block;margin-right:7px;padding:4px 8px;border-radius:999px;background:#1a3550;color:#9fd8b4;font-size:.72rem;font-weight:800}
+@media(max-width:520px){.modeRow{grid-template-columns:1fr}.modeSelect{width:100%}}
+
 </style>
 </head>
 <body>
@@ -42,14 +61,52 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
   <div class="progress"><div class="bar" id="heroBar"></div></div><div class="small muted" id="heroPct" style="margin-top:7px"></div>
   <div class="row" style="margin-top:12px"><button onclick="switchTab('week')">Open this week</button><button class="secondary" onclick="openTimer()">Workout timer</button></div>
  </div>
- <div class="card"><h3>Today</h3><div id="todayCard"></div></div>
+ 
+ <div class="card">
+  <div class="row between">
+   <div>
+    <h3>Training mode</h3>
+    <div class="small muted">Switch schedules without losing your normal Year 1 position.</div>
+   </div>
+   <select id="modeSelectHome" class="compact modeSelect" onchange="setTrainingMode(this.value)">
+    <option value="normal">Normal week</option>
+    <option value="finals">Finals week</option>
+    <option value="equipmentless">Equipmentless week</option>
+    <option value="precollege">Pre-college week</option>
+    <option value="recovery">Recovery week</option>
+    <option value="swimfocus">Swimming-focus week</option>
+   </select>
+  </div>
+  <div class="modeBanner" id="modeBannerHome"></div>
+ </div>
+
+<div class="card"><h3>Today</h3><div id="todayCard"></div></div>
  <div class="card"><h3>Readiness breakdown</h3><div class="grid" id="readinessBreakdown"></div></div>
  <div class="card"><h3>Achievements</h3><div id="achievements"></div></div>
 </section>
 
 <section id="week" class="hidden">
  <div class="card">
-  <div class="row between"><h2>Weekly plan</h2><select id="weekSelect" class="compact"></select></div>
+  <h2>Weekly plan</h2>
+  <div class="modeRow">
+   <div>
+    <div class="small muted">Training mode</div>
+    <select id="modeSelectWeek" class="modeSelect" onchange="setTrainingMode(this.value)">
+     <option value="normal">Normal week</option>
+     <option value="finals">Finals week</option>
+     <option value="equipmentless">Equipmentless week</option>
+     <option value="precollege">Pre-college week</option>
+     <option value="recovery">Recovery week</option>
+     <option value="swimfocus">Swimming-focus week</option>
+    </select>
+   </div>
+   <div id="normalWeekControl">
+    <div class="small muted">Year 1 week</div>
+    <select id="weekSelect" class="compact"></select>
+   </div>
+  </div>
+  <div class="modeBanner" id="modeBannerWeek"></div>
+
   <div class="progress" style="margin-top:12px"><div class="bar" id="weekBar"></div></div><div class="small muted" id="weekPct" style="margin-top:7px"></div>
  </div>
  <div class="card" id="weekDays"></div>
@@ -59,6 +116,15 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
   <div class="metric"><label>Pain 0–10</label><input id="pain" type="number" min="0" max="10"></div>
   <div class="metric"><label>Body weight</label><input id="weight" type="number" step=".1"></div>
  </div><label class="small muted" style="display:block;margin:12px 0 6px">Notes</label><textarea id="notes" rows="4"></textarea><button style="margin-top:10px" onclick="saveCheckin()">Save check-in</button></div>
+</section>
+
+
+<section id="strength" class="hidden">
+ <div class="card hero">
+  <h2>Strength workout library</h2>
+  <p class="muted small">Open any workout to see every exercise, the prescribed sets and reps, and a step-by-step demonstration. Semester workouts use gym equipment; break workouts use body weight and a backpack.</p>
+ </div>
+ <div id="strengthLibrary"></div>
 </section>
 
 <section id="calendar" class="hidden"><div class="card"><h2>52-week calendar</h2><p class="muted small">Green means all seven days recorded complete. Gold means partially complete.</p><div class="calendar" id="calendarGrid"></div></div></section>
@@ -83,11 +149,28 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 <div class="nav">
 <button class="active" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="icon">⌂</span>Home</button>
 <button data-tab="week" onclick="switchTab('week')"><span class="icon">✓</span>Week</button>
+<button data-tab="strength" onclick="switchTab('strength')"><span class="icon">▤</span>Strength</button>
 <button data-tab="calendar" onclick="switchTab('calendar')"><span class="icon">▦</span>Calendar</button>
 <button data-tab="progress" onclick="switchTab('progress')"><span class="icon">↗</span>Progress</button>
 </div>
 
-<div id="demoModal" class="modal hidden" onclick="closeOnBackdrop(event,'demoModal')"><div class="sheet"><div class="row between"><h2 id="demoTitle"></h2><button class="ghost" onclick="closeModal('demoModal')">Close</button></div><div class="small muted" id="demoPrescription"></div><div class="demo" id="demoVisual"><div class="person"><div class="head"></div><div class="torso"></div><div class="limb la"></div><div class="limb ra"></div><div class="limb ll"></div><div class="limb rl"></div></div></div><h3>How to do it</h3><ol class="steps" id="demoSteps"></ol><h3>Key cues</h3><div class="chips" id="demoCues"></div><div class="notice small" style="margin-top:14px">Stop for sharp pain, worsening pain, dizziness, chest pain, or unusual shortness of breath.</div></div></div>
+<div id="demoModal" class="modal hidden" onclick="closeOnBackdrop(event,'demoModal')"><div class="sheet">
+<div class="row between"><h2 id="demoTitle"></h2><button class="ghost" onclick="closeModal('demoModal')">Close</button></div>
+<div class="small muted" id="demoPrescription"></div>
+<div class="demo visual-demo" id="demoVisual"></div>
+<div class="row between">
+  <button class="secondary" id="demoPrev" onclick="changeDemoStep(-1)">‹ Previous</button>
+  <span class="badge" id="demoStepLabel">Step 1 of 3</span>
+  <button class="secondary" id="demoNext" onclick="changeDemoStep(1)">Next ›</button>
+</div>
+<div class="card" style="margin:12px 0;background:#102139">
+  <div class="small muted" id="demoPhase">SETUP</div>
+  <strong id="demoCurrentInstruction"></strong>
+</div>
+<h3>All steps</h3><ol class="steps" id="demoSteps"></ol>
+<h3>Key form cues</h3><div class="chips" id="demoCues"></div>
+<div class="notice small" style="margin-top:14px">These diagrams are simplified form guides. Start light and ask a qualified coach to check unfamiliar lifts. Stop for sharp or worsening pain, dizziness, chest pain, or unusual shortness of breath.</div>
+</div></div>
 
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>
 

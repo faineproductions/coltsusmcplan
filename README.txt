@@ -27,3 +27,15 @@ Features:
 - Ruck and joint tracking
 - Achievements
 - Supplement reminders
+
+Version 2:
+- Strength tab for Strength A, B, C, bodyweight, and recovery workouts.
+- Step-by-step exercise diagrams with Previous and Next controls.
+- Tap any written step to display its visual.
+
+Version 3:
+- Added Training Mode selector.
+- Modes: Normal Week, Finals Week, Equipmentless Week, Pre-College Week,
+  Recovery Week, and Swimming-Focus Week.
+- Each special mode saves its checklist independently.
+- Switching modes does not change or erase the selected normal Year 1 week.
