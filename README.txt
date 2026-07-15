@@ -56,3 +56,9 @@ Version 4.1 hotfix:
 - Fixed a JavaScript syntax error in the statistics code.
 - The error prevented tabs, buttons, and most interactive features from working.
 - Added visible v4.1 and BUILD 4.1 labels.
+
+Version 4.2:
+- Removed BUILD number from the YEAR 1 badge.
+- Readiness categories are now tappable.
+- Each category explains the score, data used, strengths, weaknesses, and next actions.
+- Added detailed explanations for consistency, strength, endurance, swimming, rucking, and recovery.

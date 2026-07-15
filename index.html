@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Marine Prep Pro v4.1</title>
+<title>Marine Prep Pro v4.2</title>
 <link rel="manifest" href="manifest.json">
 <style>
 :root{--bg:#07111f;--panel:#0e1b2e;--panel2:#13243a;--line:#243a56;--text:#f3f7fc;--muted:#9db0c8;--green:#4ade80;--yellow:#fbbf24;--red:#fb7185;--blue:#60a5fa;--safe:env(safe-area-inset-bottom)}
@@ -58,10 +58,20 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 .exerciseHistory{padding:11px;background:var(--panel2);border-radius:12px;margin:8px 0}
 .countdown{font-size:1.2rem;font-weight:800;color:var(--blue)}
 
+
+.readinessTile{cursor:pointer;transition:transform .12s ease,border-color .12s ease}
+.readinessTile:active{transform:scale(.98)}
+.readinessTile:hover{border-color:#3e6288}
+.detailLine{padding:9px 0;border-bottom:1px solid #203652}
+.detailLine:last-child{border-bottom:0}
+.detailGood{color:var(--green)}
+.detailWarn{color:var(--yellow)}
+.detailBad{color:var(--red)}
+
 </style>
 </head>
 <body>
-<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v4.1</span></h1><span class="badge">YEAR 1 · BUILD 4.1</span></div></div>
+<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v4.2</span></h1><span class="badge">YEAR 1</span></div></div>
 <main>
 <section id="dashboard">
  <div class="card hero">
@@ -247,6 +257,36 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
  <div class="card"><strong>Increase</strong><p class="small muted">When all work is completed, pain is 0–2, and RPE is 7 or lower: usually add 2.5–5 lb for upper-body exercises or 5–10 lb for lower-body exercises.</p></div>
  <div class="card"><strong>Hold steady</strong><p class="small muted">At RPE 8, or when form was merely acceptable: repeat the same weight and improve control.</p></div>
  <div class="card"><strong>Reduce or modify</strong><p class="small muted">At RPE 9–10, missed repetitions, or pain above 2: reduce the weight or use an easier variation. Sharp or worsening pain should not be trained through.</p></div>
+</div></div>
+
+
+<div id="readinessModal" class="modal hidden" onclick="closeOnBackdrop(event,'readinessModal')"><div class="sheet">
+ <div class="row between">
+  <h2 id="readinessModalTitle">Readiness explanation</h2>
+  <button class="ghost" onclick="closeModal('readinessModal')">Close</button>
+ </div>
+ <div class="ring" id="readinessDetailRing" style="margin:12px auto"><div class="ringin"><div><div class="score" id="readinessDetailScore">0</div><div class="small muted">percent</div></div></div></div>
+ <div class="card" style="background:#102139">
+  <div class="small muted">WHY THIS SCORE</div>
+  <p id="readinessReason" style="margin-bottom:0"></p>
+ </div>
+ <div class="card">
+  <h3>Data used</h3>
+  <div id="readinessInputs"></div>
+ </div>
+ <div class="card">
+  <h3>What is helping</h3>
+  <div id="readinessStrengths"></div>
+ </div>
+ <div class="card">
+  <h3>What is holding it back</h3>
+  <div id="readinessWeaknesses"></div>
+ </div>
+ <div class="card">
+  <h3>How to raise the score</h3>
+  <div id="readinessActions"></div>
+ </div>
+ <div class="notice small">This is a training estimate, not a medical clearance or official Marine Corps assessment.</div>
 </div></div>
 
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>

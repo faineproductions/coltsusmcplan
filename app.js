@@ -94,9 +94,189 @@ function renderDashboard(){
  document.getElementById('readinessScore').textContent=total;
  document.getElementById('readinessRing').style.background=`conic-gradient(var(--green) ${total100*3.6}deg,#1d3049 0)`;
  saveReadinessSnapshot(total);
- document.getElementById('readinessBreakdown').innerHTML=Object.entries(scores).map(([k,v])=>`<div class="metric"><label>${k[0].toUpperCase()+k.slice(1)}</label><strong>${v}%</strong><div class="progress" style="margin-top:7px"><div class="bar" style="width:${v}%"></div></div></div>`).join('');
+ document.getElementById('readinessBreakdown').innerHTML=Object.entries(scores).map(([k,v])=>`<div class="metric readinessTile" onclick="openReadinessDetail('${k}')"><label>${k[0].toUpperCase()+k.slice(1)}</label><strong>${v}%</strong><div class="progress" style="margin-top:7px"><div class="bar" style="width:${v}%"></div></div><div class="small muted" style="margin-top:7px">Tap for explanation</div></div>`).join('');
  renderAchievements();renderQuickStats();
 }
+
+function openReadinessDetail(category){
+ const scores=readiness();
+ const h=progressHistory(),latest=h[h.length-1]||{};
+ const weekState=JSON.parse(localStorage.getItem('mp_week_'+currentWeek)||'{}');
+ const score=scores[category]||0;
+ const details=readinessExplanation(category,score,latest,weekState);
+ document.getElementById('readinessModalTitle').textContent=details.title;
+ document.getElementById('readinessDetailScore').textContent=score;
+ document.getElementById('readinessDetailRing').style.background=`conic-gradient(var(--green) ${score*3.6}deg,#1d3049 0)`;
+ document.getElementById('readinessReason').textContent=details.reason;
+ document.getElementById('readinessInputs').innerHTML=details.inputs.map(x=>`<div class="detailLine"><strong>${x.label}</strong><div class="small muted">${x.value}</div></div>`).join('');
+ document.getElementById('readinessStrengths').innerHTML=renderDetailList(details.strengths,'detailGood','Nothing is being credited here yet.');
+ document.getElementById('readinessWeaknesses').innerHTML=renderDetailList(details.weaknesses,'detailWarn','No major weakness is currently detected.');
+ document.getElementById('readinessActions').innerHTML=renderDetailList(details.actions,'','Keep following the plan consistently.');
+ document.getElementById('readinessModal').classList.remove('hidden');
+}
+function renderDetailList(items,cls,emptyText){
+ if(!items.length)return `<div class="small muted">${emptyText}</div>`;
+ return items.map(x=>`<div class="detailLine ${cls}">• ${x}</div>`).join('');
+}
+function readinessExplanation(category,score,latest,weekState){
+ const completed=countCompletedDays();
+ const completeWeeks=completedWeeks();
+ const sleep=+weekState.sleep||0;
+ const pain=+weekState.pain||0;
+ const push=+latest.pushups||0;
+ const pull=+latest.pullups||0;
+ const plank=+latest.plank||0;
+ const swim=+latest.swimdist||0;
+ const tread=+latest.tread||0;
+ const ruckDist=+latest.ruckdist||0;
+ const ruckWt=+latest.ruckwt||0;
+ const run3=latest.run3||'';
+ let runSec=0;
+ if(run3&&run3.includes(':')){const p=run3.split(':').map(Number);runSec=(p[0]||0)*60+(p[1]||0)}
+ const fmtRun=run3||'No 3-mile time logged';
+ const common={
+  consistency:{
+   title:'Consistency readiness',
+   reason:'This measures how regularly you are actually completing the program. It rewards completed training days and full weeks rather than one-time personal records.',
+   inputs:[
+    {label:'Completed training days',value:String(completed)},
+    {label:'Fully completed normal weeks',value:String(completeWeeks)},
+    {label:'Current normal program week',value:'Week '+currentWeek}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  },
+  strength:{
+   title:'Strength readiness',
+   reason:'This combines push-ups, pull-ups, and plank performance. Pull-ups carry substantial weight because moving your own body is especially useful for Marine training.',
+   inputs:[
+    {label:'Push-ups',value:push?push+' logged':'No result logged'},
+    {label:'Pull-ups',value:pull?pull+' logged':'No result logged'},
+    {label:'Plank',value:plank?plank+' seconds':'No result logged'}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  },
+  endurance:{
+   title:'Endurance readiness',
+   reason:'This currently uses your logged 3-mile time because it gives the clearest single measure of running readiness. A missing result leaves this category near its starting score.',
+   inputs:[
+    {label:'Latest 3-mile result',value:fmtRun},
+    {label:'Current score basis',value:runSec?'Compared with a beginner range and an advanced 18-minute target':'No timed result is available yet'}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  },
+  swimming:{
+   title:'Swimming readiness',
+   reason:'This combines continuous swim distance and treading-water time. Continuous distance carries slightly more weight, but both matter.',
+   inputs:[
+    {label:'Continuous swim',value:swim?swim+' yards':'No result logged'},
+    {label:'Treading water',value:tread?tread+' minutes':'No result logged'},
+    {label:'Year 1 comparison targets',value:'800 yards continuous and 15 minutes treading'}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  },
+  rucking:{
+   title:'Rucking readiness',
+   reason:'This combines your longest logged ruck distance and pack weight. The score is intentionally based on gradual Year 1 targets rather than rewarding unsafe heavy loading.',
+   inputs:[
+    {label:'Longest ruck distance',value:ruckDist?ruckDist+' miles':'No result logged'},
+    {label:'Ruck load',value:ruckWt?ruckWt+' lb':'No result logged'},
+    {label:'Year 1 comparison targets',value:'6 miles with about 25 lb'}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  },
+  recovery:{
+   title:'Recovery readiness',
+   reason:'This estimates whether your current sleep and pain levels support productive training. Poor recovery can limit every other category even when fitness is improving.',
+   inputs:[
+    {label:'Average sleep this week',value:sleep?sleep+' hours':'No sleep average saved'},
+    {label:'Pain this week',value:(weekState.pain!==undefined&&weekState.pain!=='')?pain+'/10':'No pain rating saved'}
+   ],
+   strengths:[],
+   weaknesses:[],
+   actions:[]
+  }
+ };
+ const d=common[category];
+
+ if(category==='consistency'){
+  if(completed>=20)d.strengths.push('You have already recorded '+completed+' completed training days.');
+  if(completeWeeks>=1)d.strengths.push('You have at least one fully completed week.');
+  if(completed<10)d.weaknesses.push('There are not many completed days logged yet, so the app has little evidence of sustained consistency.');
+  if(completeWeeks===0)d.weaknesses.push('No normal Year 1 week has all seven daily entries completed.');
+  d.actions.push('Complete the scheduled sessions and mark them honestly.');
+  d.actions.push('Aim for consistency across several weeks rather than trying to make up missed sessions all at once.');
+ }
+ if(category==='strength'){
+  if(push>=30)d.strengths.push('Your push-up result already meets the first major benchmark of 30.');
+  if(pull>=5)d.strengths.push('Your pull-up result shows useful relative upper-body strength.');
+  if(plank>=120)d.strengths.push('A plank of at least two minutes is contributing strongly.');
+  if(!push)d.weaknesses.push('No push-up result is logged.');
+  else if(push<30)d.weaknesses.push('Push-ups are below the first 30-repetition benchmark.');
+  if(!pull)d.weaknesses.push('No pull-up result is logged.');
+  else if(pull<5)d.weaknesses.push('Pull-ups are still in the early-development range.');
+  if(!plank)d.weaknesses.push('No plank result is logged.');
+  else if(plank<120)d.weaknesses.push('Plank endurance is below two minutes.');
+  d.actions.push('Log fresh push-up, pull-up, and plank results during assessment weeks.');
+  d.actions.push('Use submaximal practice and gradual progression instead of testing maximums every workout.');
+ }
+ if(category==='endurance'){
+  if(runSec&&runSec<=1500)d.strengths.push('Your latest 3-mile time is 25 minutes or faster.');
+  if(runSec&&runSec<=1320)d.strengths.push('You are at or below 22 minutes, which is a strong intermediate result.');
+  if(!runSec)d.weaknesses.push('There is no valid 3-mile time logged, so the app cannot award much endurance readiness.');
+  else if(runSec>1800)d.weaknesses.push('The latest time is over 30 minutes, showing that the aerobic base still needs development.');
+  else if(runSec>1500)d.weaknesses.push('The latest time is above 25 minutes, leaving room before the stronger readiness range.');
+  d.actions.push('Follow the easy-run progression and avoid turning every run into a test.');
+  d.actions.push('Log a controlled 3-mile result during scheduled assessment weeks.');
+  if(runSec)d.actions.push('Improving the 3-mile result gradually will directly raise this score.');
+ }
+ if(category==='swimming'){
+  if(swim>=500)d.strengths.push('You can swim at least 500 yards continuously.');
+  if(tread>=10)d.strengths.push('You can tread water for at least 10 minutes.');
+  if(!swim)d.weaknesses.push('No continuous swim distance is logged.');
+  else if(swim<250)d.weaknesses.push('Continuous distance is still below 250 yards.');
+  else if(swim<800)d.weaknesses.push('Continuous distance has not yet reached the Year 1 target of 800 yards.');
+  if(!tread)d.weaknesses.push('No treading-water result is logged.');
+  else if(tread<5)d.weaknesses.push('Treading endurance is below five minutes.');
+  else if(tread<15)d.weaknesses.push('Treading has not yet reached the Year 1 comparison target of 15 minutes.');
+  d.actions.push('Repeat your current swimming gate until it is calm and controlled.');
+  d.actions.push('Use technique sessions and endurance sessions separately.');
+  d.actions.push('Log both continuous distance and treading time after safe assessments.');
+ }
+ if(category==='rucking'){
+  if(ruckDist>=4)d.strengths.push('You have completed at least four miles under load.');
+  if(ruckWt>=20)d.strengths.push('You have handled at least 20 lb.');
+  if(!ruckDist)d.weaknesses.push('No ruck distance is logged.');
+  else if(ruckDist<4)d.weaknesses.push('Logged ruck distance is still below four miles.');
+  if(!ruckWt)d.weaknesses.push('No ruck weight is logged.');
+  else if(ruckWt<20)d.weaknesses.push('Logged load is still below 20 lb.');
+  d.actions.push('Increase only one variable at a time: distance, weight, or pace.');
+  d.actions.push('Keep rucks pain-free and never run with the pack.');
+  d.actions.push('Log distance and load together so the score can judge both.');
+ }
+ if(category==='recovery'){
+  if(sleep>=7.5)d.strengths.push('Your saved sleep average is at least 7.5 hours.');
+  if(weekState.pain!==undefined&&weekState.pain!==''&&pain<=2)d.strengths.push('Your reported pain is low.');
+  if(!sleep)d.weaknesses.push('No sleep average is saved for this week.');
+  else if(sleep<7)d.weaknesses.push('Average sleep is below seven hours.');
+  if(weekState.pain===undefined||weekState.pain==='')d.weaknesses.push('No pain rating is saved for this week.');
+  else if(pain>2)d.weaknesses.push('Pain above 2/10 is lowering the recovery score.');
+  d.actions.push('Save the weekly sleep and pain check-in.');
+  d.actions.push('Use recovery weeks when fatigue accumulates instead of forcing normal volume.');
+  d.actions.push('Persistent, sharp, or worsening pain should be evaluated rather than trained through.');
+ }
+ return d;
+}
+
 function readiness(){
  let hist=progressHistory(),latest=hist[hist.length-1]||{};
  let completed=0;for(let w=1;w<=currentWeek;w++){let normalState=JSON.parse(localStorage.getItem('mp_week_'+w)||'{}');completed+=DAYS.filter(d=>normalState[d]).length;}
