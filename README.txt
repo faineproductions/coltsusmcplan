@@ -39,3 +39,15 @@ Version 3:
   Recovery Week, and Swimming-Focus Week.
 - Each special mode saves its checklist independently.
 - Switching modes does not change or erase the selected normal Year 1 week.
+
+Version 4:
+- Visible v4 label in the app header and browser title.
+- Marine readiness score expanded to 0–1000.
+- Automatic weight and difficulty recommendations from exercise logs.
+- Exercise logging for weight, sets, reps, RPE, pain, and notes.
+- Actual video button opens a YouTube search for the exercise.
+- Expanded achievements.
+- Full statistics page and readiness history.
+- Ship-date countdown.
+- Export/import backup.
+- Automatic progression guide.

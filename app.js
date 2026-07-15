@@ -3,6 +3,7 @@ const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunda
 let currentWeek=Number(localStorage.getItem('currentWeek')||1);
 let timerSeconds=0,timerHandle=null;
 let activeDemo=null, activeDemoStep=0;
+let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
@@ -43,7 +44,7 @@ function switchTab(id){
  document.querySelectorAll('main>section').forEach(s=>s.classList.add('hidden'));
  document.getElementById(id).classList.remove('hidden');
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));
- if(id==='calendar')renderCalendar(); if(id==='progress')drawChart(); if(id==='strength')renderStrengthLibrary();
+ if(id==='calendar')renderCalendar(); if(id==='progress')drawChart(); if(id==='strength')renderStrengthLibrary(); if(id==='stats')renderStats();
 }
 function pctForWeek(w){
  if(trainingMode!=='normal' && w!==currentWeek){
@@ -88,11 +89,13 @@ function renderDashboard(){
  let ex=plan.exercises.map(e=>`<div class="exercise" onclick='openDemo(${JSON.stringify(e.name)},${JSON.stringify(e.prescription)})'><div><strong>${e.name}</strong><span class="small muted">${e.prescription}</span></div><span class="tap">Demo ›</span></div>`).join('');
  document.getElementById('todayCard').innerHTML=`<div class="row between"><div><strong>${day}</strong><div class="small muted">${plan.title}</div></div><span class="badge">${state[day]?'Complete':'Planned'}</span></div>${ex||'<p class="muted small">Rest or recovery day.</p>'}`;
  let scores=readiness();
- let total=Math.round((scores.consistency+scores.strength+scores.endurance+scores.swimming+scores.rucking+scores.recovery)/6);
+ let total100=Math.round((scores.consistency+scores.strength+scores.endurance+scores.swimming+scores.rucking+scores.recovery)/6);
+ let total=total100*10;
  document.getElementById('readinessScore').textContent=total;
- document.getElementById('readinessRing').style.background=`conic-gradient(var(--green) ${total*3.6}deg,#1d3049 0)`;
+ document.getElementById('readinessRing').style.background=`conic-gradient(var(--green) ${total100*3.6}deg,#1d3049 0)`;
+ saveReadinessSnapshot(total);
  document.getElementById('readinessBreakdown').innerHTML=Object.entries(scores).map(([k,v])=>`<div class="metric"><label>${k[0].toUpperCase()+k.slice(1)}</label><strong>${v}%</strong><div class="progress" style="margin-top:7px"><div class="bar" style="width:${v}%"></div></div></div>`).join('');
- renderAchievements();
+ renderAchievements();renderQuickStats();
 }
 function readiness(){
  let hist=progressHistory(),latest=hist[hist.length-1]||{};
@@ -106,18 +109,26 @@ function readiness(){
  return{consistency,strength,endurance,swimming,rucking,recovery}
 }
 function renderAchievements(){
- const h=progressHistory(),l=h[h.length-1]||{};const doneWeeks=[...Array(52)].filter((_,i)=>pctForWeek(i+1)===100).length;
+ const h=progressHistory(),l=h[h.length-1]||{},logs=exerciseLogs();
+ const doneWeeks=[...Array(52)].filter((_,i)=>{let s=JSON.parse(localStorage.getItem('mp_week_'+(i+1))||'{}');return DAYS.filter(d=>s[d]).length===7}).length;
+ const totalDays=countCompletedDays();
  const list=[
- ['First Complete Week',doneWeeks>=1,'Finish all seven daily entries in one week'],
- ['First Pull-up',(+l.pullups||0)>=1,'Record one strict pull-up'],
- ['Push-up 30',(+l.pushups||0)>=30,'Record 30 clean push-ups'],
- ['Push-up 60',(+l.pushups||0)>=60,'Record 60 clean push-ups'],
- ['Swim 500',(+l.swimdist||0)>=500,'Swim 500 yards continuously'],
- ['Ten-Minute Tread',(+l.tread||0)>=10,'Tread water for 10 minutes'],
- ['Six-Mile Ruck',(+l.ruckdist||0)>=6,'Complete a six-mile ruck'],
- ['Consistency 10',doneWeeks>=10,'Complete ten full weeks']
+  ['First Complete Week',doneWeeks>=1,'Finish all seven entries in one normal week'],
+  ['Ten Complete Weeks',doneWeeks>=10,'Finish ten complete normal weeks'],
+  ['Hundred Training Days',totalDays>=100,'Record 100 completed days'],
+  ['First Pull-up',(+l.pullups||0)>=1,'Record one strict pull-up'],
+  ['Ten Pull-ups',(+l.pullups||0)>=10,'Record ten strict pull-ups'],
+  ['Push-up 30',(+l.pushups||0)>=30,'Record 30 clean push-ups'],
+  ['Push-up 60',(+l.pushups||0)>=60,'Record 60 clean push-ups'],
+  ['Three-Minute Plank',(+l.plank||0)>=180,'Hold a strict plank for 3 minutes'],
+  ['Swim 500',(+l.swimdist||0)>=500,'Swim 500 yards continuously'],
+  ['Swim 800',(+l.swimdist||0)>=800,'Swim 800 yards continuously'],
+  ['Ten-Minute Tread',(+l.tread||0)>=10,'Tread water for 10 minutes'],
+  ['Six-Mile Ruck',(+l.ruckdist||0)>=6,'Complete a six-mile ruck'],
+  ['Twenty Exercise Logs',logs.length>=20,'Log 20 strength exercise performances']
  ];
- document.getElementById('achievements').innerHTML=list.slice(0,5).map(a=>`<div class="achievement ${a[1]?'':'locked'}"><div style="font-size:1.5rem">${a[1]?'🏆':'🔒'}</div><div><strong>${a[0]}</strong><div class="small muted">${a[2]}</div></div></div>`).join('');
+ const unlocked=list.filter(a=>a[1]).length;
+ document.getElementById('achievements').innerHTML='<div class="small muted" style="margin-bottom:8px">'+unlocked+' of '+list.length+' unlocked</div>'+list.slice(0,7).map(a=>`<div class="achievement ${a[1]?'':'locked'}"><div style="font-size:1.5rem">${a[1]?'🏆':'🔒'}</div><div><strong>${a[0]}</strong><div class="small muted">${a[2]}</div></div></div>`).join('');
 }
 
 function renderStrengthLibrary(){
@@ -144,6 +155,81 @@ function findWorkoutExercises(title){
  return [];
 }
 function toggleWorkout(i){document.getElementById('workoutBody'+i).classList.toggle('hiddenBody')}
+
+
+function countCompletedDays(){
+ let n=0;
+ for(let w=1;w<=52;w++){let s=JSON.parse(localStorage.getItem('mp_week_'+w)||'{}');n+=DAYS.filter(d=>s[d]).length}
+ ['finals','equipmentless','precollege','recovery','swimfocus'].forEach(mode=>{let s=JSON.parse(localStorage.getItem('mp_mode_'+mode)||'{}');n+=DAYS.filter(d=>s[d]).length});
+ return n;
+}
+function currentStreak(){
+ let streak=0;
+ for(let w=currentWeek;w>=1;w--){
+  let s=JSON.parse(localStorage.getItem('mp_week_'+w)||'{}'),done=DAYS.filter(d=>s[d]).length;
+  if(done===7)streak++;else if(w!==currentWeek||done===0)break;
+ }
+ return streak;
+}
+function completedWeeks(){
+ let n=0;for(let w=1;w<=52;w++){let s=JSON.parse(localStorage.getItem('mp_week_'+w)||'{}');if(DAYS.filter(d=>s[d]).length===7)n++}return n;
+}
+function shipCountdown(){
+ const d=localStorage.getItem('mp_ship_date');if(!d)return 'Not set';
+ const days=Math.ceil((new Date(d+'T12:00:00')-new Date())/86400000);
+ return days>=0?days+' days':Math.abs(days)+' days past';
+}
+function renderQuickStats(){
+ const logs=exerciseLogs(),h=progressHistory(),latest=h[h.length-1]||{};
+ const items=[
+  ['Completed days',countCompletedDays()],
+  ['Complete weeks',completedWeeks()],
+  ['Week streak',currentStreak()],
+  ['Exercise logs',logs.length],
+  ['Ship countdown',shipCountdown()],
+  ['Current mode',activeModeInfo().label]
+ ];
+ document.getElementById('quickStats').innerHTML=items.map(x=>`<div class="metric"><label>${x[0]}</label><span class="statBig">${x[1]}</span></div>`).join('');
+}
+function saveReadinessSnapshot(score){
+ let hist=JSON.parse(localStorage.getItem('mp_readiness_history')||'[]');
+ const today=new Date().toISOString().slice(0,10),last=hist[hist.length-1];
+ if(last&&last.date===today)last.score=score;else hist.push({date:today,score});
+ localStorage.setItem('mp_readiness_history',JSON.stringify(hist.slice(-180)));
+}
+function renderStats(){
+ const h=progressHistory(),latest=h[h.length-1]||{},logs=exerciseLogs();
+ const overview=[
+  ['Training days',countCompletedDays()],
+  ['Completed weeks',completedWeeks()],
+  ['Current full-week streak',currentStreak()],
+  ['Exercise entries',logs.length],
+  ['Readiness score',document.getElementById('readinessScore')?.textContent||'—'],
+  ['Ship countdown',shipCountdown()]
+ ];
+ document.getElementById('fullStats').innerHTML=overview.map(x=>`<div class="metric"><label>${x[0]}</label><span class="statBig">${x[1]}</span></div>`).join('');
+ const records=[
+  ['Push-ups',latest.pushups||'—'],['Pull-ups',latest.pullups||'—'],['Plank',latest.plank?latest.plank+' sec':'—'],
+  ['3-mile',latest.run3||'—'],['Continuous swim',latest.swimdist?latest.swimdist+' yd':'—'],
+  ['Tread',latest.tread?latest.tread+' min':'—'],['Ruck',latest.ruckdist?latest.ruckdist+' mi':'—'],
+  ['Ruck load',latest.ruckwt?latest.ruckwt+' lb':'—']
+ ];
+ document.getElementById('personalRecords').innerHTML=records.map(x=>`<div class="metric"><label>${x[0]}</label><span class="statBig">${x[1]}</span></div>`).join('');
+ const by={};logs.forEach(l=>(by[l.name]||(by[l.name]=[])).push(l);
+ const names=Object.keys(by).sort().slice(0,20);
+ document.getElementById('exerciseProgression').innerHTML=names.length?names.map(name=>{
+  const arr=by[name],last=arr[arr.length-1],best=Math.max(...arr.map(x=>+x.weight||0));
+  return `<div class="exerciseHistory"><strong>${name}</strong><div class="small muted">${arr.length} logs · heaviest ${best?formatWeight(best):'bodyweight'} · latest RPE ${last.rpe}</div><div class="small ${nextWeightRecommendation(last).cls}" style="margin-top:5px">${nextWeightRecommendation(last).text}</div></div>`;
+ }).join(''):'<p class="muted small">Log exercises from their demonstration pages to build progression history.</p>';
+ drawReadinessChart();
+}
+function drawReadinessChart(){
+ const c=document.getElementById('readinessChart');if(!c)return;const ctx=c.getContext('2d'),h=JSON.parse(localStorage.getItem('mp_readiness_history')||'[]').slice(-30);
+ ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle='#294764';ctx.lineWidth=1;for(let i=0;i<5;i++){let y=25+i*45;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(c.width-15,y);ctx.stroke()}
+ if(!h.length){ctx.fillStyle='#9db0c8';ctx.font='18px sans-serif';ctx.fillText('Readiness history will appear here.',55,120);return}
+ ctx.strokeStyle='#60a5fa';ctx.lineWidth=4;ctx.beginPath();
+ h.forEach((v,i)=>{let x=40+i*(c.width-70)/Math.max(1,h.length-1),y=220-(v.score/1000)*175;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();
+}
 
 function renderCalendar(){
  const g=document.getElementById('calendarGrid');g.innerHTML='';
@@ -177,6 +263,7 @@ function renderDemoStep(){
  document.getElementById('demoPrev').disabled=activeDemoStep===0;
  document.getElementById('demoNext').disabled=activeDemoStep===total-1;
  document.getElementById('demoVisual').innerHTML=exerciseDiagram(e.animation||'default',activeDemoStep,activeDemo.name);
+ renderExerciseRecommendation(activeDemo.name);
 }
 function exerciseDiagram(type,step,name){
  const defs='<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#60a5fa"/></marker></defs>';
@@ -231,6 +318,99 @@ function exerciseDiagram(type,step,name){
  return '<svg viewBox="0 0 400 235" role="img" aria-label="'+escapeSvg(name)+' demonstration">'+defs+label+floor+body+arrow+'</svg>';
 }
 function escapeSvg(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function exerciseLogs(){return JSON.parse(localStorage.getItem('mp_exercise_logs')||'[]')}
+function logsForExercise(name){return exerciseLogs().filter(x=>x.name===name)}
+function watchExerciseVideo(){
+ if(!activeDemo)return;
+ const q=encodeURIComponent(activeDemo.name+' proper form exercise demonstration');
+ window.open('https://www.youtube.com/results?search_query='+q,'_blank','noopener');
+}
+function classifyExercise(name){
+ const lower=name.toLowerCase();
+ const lowerBody=['squat','lunge','step-up','deadlift','calf','bridge','hip','leg','ruck'];
+ const upperBody=['press','push-up','row','pull','face pull'];
+ if(lowerBody.some(x=>lower.includes(x)))return 'lower';
+ if(upperBody.some(x=>lower.includes(x)))return 'upper';
+ return 'bodyweight';
+}
+function nextWeightRecommendation(log){
+ if(!log)return {text:'No previous log yet. Start light enough to leave 2–3 good repetitions in reserve.',cls:'recHold'};
+ const w=+log.weight||0,rpe=+log.rpe||0,pain=+log.pain||0,type=classifyExercise(log.name);
+ if(pain>2)return {text:'Pain was '+pain+'/10. Do not increase. Reduce load or use an easier pain-free variation; seek evaluation for sharp, worsening, or persistent pain.',cls:'recReduce'};
+ if(rpe>=9)return {text:'Last effort was very hard. Reduce about 5–10% or repeat with fewer repetitions and cleaner form.',cls:'recReduce'};
+ if(rpe===8)return {text:'Repeat '+(w?formatWeight(w):'the same difficulty')+' and aim for smoother repetitions before increasing.',cls:'recHold'};
+ if(rpe>0&&rpe<=7){
+   if(type==='upper'&&w)return {text:'Suggested next weight: '+formatWeight(w+5)+' total, or the next smallest available increase.',cls:'recGood'};
+   if(type==='lower'&&w)return {text:'Suggested next weight: '+formatWeight(w+10)+' total, or add only 5 lb if technique was not perfect.',cls:'recGood'};
+   if(w)return {text:'Suggested next weight: '+formatWeight(w+2.5)+' or a slightly harder variation.',cls:'recGood'};
+   return {text:'Progress by adding 1–2 repetitions per set or choosing a slightly harder variation.',cls:'recGood'};
+ }
+ return {text:'Repeat the current difficulty and record an RPE to unlock a clearer recommendation.',cls:'recHold'};
+}
+function formatWeight(w){return Number.isInteger(w)?w+' lb':w.toFixed(1)+' lb'}
+function renderExerciseRecommendation(name){
+ const logs=logsForExercise(name),last=logs[logs.length-1],rec=nextWeightRecommendation(last);
+ const el=document.getElementById('weightRecommendation');if(!el)return;
+ el.textContent=rec.text;el.className=rec.cls;
+ document.getElementById('lastExerciseLog').textContent=last?('Last: '+(last.weight?formatWeight(+last.weight):'bodyweight')+', '+last.sets+' sets × '+last.reps+' reps, RPE '+last.rpe+', pain '+last.pain+'/10'):'No previous log.';
+}
+function openExerciseLog(){
+ if(!activeDemo)return;
+ activeExerciseLogName=activeDemo.name;
+ document.getElementById('logExerciseName').textContent=activeExerciseLogName;
+ const last=logsForExercise(activeExerciseLogName).slice(-1)[0];
+ document.getElementById('exerciseWeight').value=last?.weight||'';
+ document.getElementById('exerciseSets').value=last?.sets||'';
+ document.getElementById('exerciseReps').value=last?.reps||'';
+ document.getElementById('exerciseRPE').value='';
+ document.getElementById('exercisePain').value='0';
+ document.getElementById('exerciseNotes').value='';
+ document.getElementById('exerciseLogModal').classList.remove('hidden');
+}
+function saveExerciseLog(){
+ const entry={
+  name:activeExerciseLogName,date:new Date().toISOString(),week:currentWeek,mode:trainingMode,
+  weight:document.getElementById('exerciseWeight').value,
+  sets:document.getElementById('exerciseSets').value,
+  reps:document.getElementById('exerciseReps').value,
+  rpe:document.getElementById('exerciseRPE').value,
+  pain:document.getElementById('exercisePain').value,
+  notes:document.getElementById('exerciseNotes').value
+ };
+ if(!entry.rpe){alert('Enter an RPE from 1 to 10.');return}
+ const logs=exerciseLogs();logs.push(entry);localStorage.setItem('mp_exercise_logs',JSON.stringify(logs));
+ closeModal('exerciseLogModal');renderExerciseRecommendation(activeExerciseLogName);renderAll();
+ alert(nextWeightRecommendation(entry).text);
+}
+function openGoalSetup(){
+ document.getElementById('shipDate').value=localStorage.getItem('mp_ship_date')||'';
+ document.getElementById('goalModal').classList.remove('hidden');
+}
+function saveShipDate(){
+ const d=document.getElementById('shipDate').value;
+ if(!d){alert('Choose a date.');return}
+ localStorage.setItem('mp_ship_date',d);closeModal('goalModal');renderAll();
+}
+function showProgressionGuide(){document.getElementById('guideModal').classList.remove('hidden')}
+function exportBackup(){
+ const backup={version:4,exported:new Date().toISOString(),storage:{}};
+ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('mp_')||['currentWeek','trainingMode'].includes(k))backup.storage[k]=localStorage.getItem(k)}
+ const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='marine-prep-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+}
+function importBackup(event){
+ const file=event.target.files[0];if(!file)return;
+ const reader=new FileReader();reader.onload=()=>{
+  try{
+   const data=JSON.parse(reader.result);if(!data.storage)throw new Error('Invalid backup');
+   Object.entries(data.storage).forEach(([k,v])=>localStorage.setItem(k,v));
+   currentWeek=Number(localStorage.getItem('currentWeek')||1);trainingMode=localStorage.getItem('trainingMode')||'normal';
+   renderAll();alert('Backup imported.');
+  }catch(e){alert('This does not appear to be a valid Marine Prep backup.')}
+ };reader.readAsText(file);event.target.value='';
+}
+
 function closeModal(id){document.getElementById(id).classList.add('hidden')}function closeOnBackdrop(e,id){if(e.target.id===id)closeModal(id)}
 function saveProgress(){
  let entry={date:new Date().toISOString(),week:currentWeek};['pushups','pullups','plank','run3','swimdist','tread','ruckdist','ruckwt'].forEach(id=>entry[id]=document.getElementById(id).value);
@@ -256,6 +436,6 @@ function renderSupplements(){
 function openTimer(){document.getElementById('timerModal').classList.remove('hidden')}function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}function timerRender(){document.getElementById('timerText').textContent=fmt(timerSeconds)}function setTimer(s){timerPause();timerSeconds=s;timerRender()}function timerStart(){if(timerHandle)return;timerHandle=setInterval(()=>{if(timerSeconds>0){timerSeconds--;timerRender()}else{timerPause();navigator.vibrate&&navigator.vibrate([200,100,200]);alert('Timer complete.')}},1000)}function timerPause(){clearInterval(timerHandle);timerHandle=null}function timerReset(){timerPause();timerSeconds=0;timerRender()}
 function renderAll(){
  document.querySelectorAll('.modeSelect').forEach(s=>s.value=trainingMode);
- renderWeek();renderDashboard();renderStrengthLibrary();renderCalendar();renderSwimGates();renderSupplements()
+ renderWeek();renderDashboard();renderStrengthLibrary();renderCalendar();renderSwimGates();renderSupplements();if(!document.getElementById('stats').classList.contains('hidden'))renderStats()
 }
 renderAll();drawChart();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');

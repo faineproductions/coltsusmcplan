@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Marine Prep Pro</title>
+<title>Marine Prep Pro v4</title>
 <link rel="manifest" href="manifest.json">
 <style>
 :root{--bg:#07111f;--panel:#0e1b2e;--panel2:#13243a;--line:#243a56;--text:#f3f7fc;--muted:#9db0c8;--green:#4ade80;--yellow:#fbbf24;--red:#fb7185;--blue:#60a5fa;--safe:env(safe-area-inset-bottom)}
@@ -50,14 +50,22 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 .modePill{display:inline-block;margin-right:7px;padding:4px 8px;border-radius:999px;background:#1a3550;color:#9fd8b4;font-size:.72rem;font-weight:800}
 @media(max-width:520px){.modeRow{grid-template-columns:1fr}.modeSelect{width:100%}}
 
+
+.versionMark{font-size:.68rem;color:var(--green);border:1px solid #2f6b4b;padding:3px 6px;border-radius:999px;vertical-align:middle}
+.nav button{font-size:.66rem}
+.statBig{font-size:1.55rem;font-weight:850;display:block}
+.recGood{color:var(--green)}.recHold{color:var(--yellow)}.recReduce{color:var(--red)}
+.exerciseHistory{padding:11px;background:var(--panel2);border-radius:12px;margin:8px 0}
+.countdown{font-size:1.2rem;font-weight:800;color:var(--blue)}
+
 </style>
 </head>
 <body>
-<div class="top"><div class="brand"><h1>Marine Prep Pro</h1><span class="badge">YEAR 1</span></div></div>
+<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v4</span></h1><span class="badge">YEAR 1 · BUILD 4</span></div></div>
 <main>
 <section id="dashboard">
  <div class="card hero">
-  <div class="row between"><div><div class="muted small">Current training week</div><h2 id="heroWeek">Week 1</h2></div><div class="ring" id="readinessRing"><div class="ringin"><div><div class="score" id="readinessScore">0</div><div class="small muted">readiness</div></div></div></div></div>
+  <div class="row between"><div><div class="muted small">Current training week</div><h2 id="heroWeek">Week 1</h2></div><div class="ring" id="readinessRing"><div class="ringin"><div><div class="score" id="readinessScore">0</div><div class="small muted">of 1000</div></div></div></div></div>
   <div class="progress"><div class="bar" id="heroBar"></div></div><div class="small muted" id="heroPct" style="margin-top:7px"></div>
   <div class="row" style="margin-top:12px"><button onclick="switchTab('week')">Open this week</button><button class="secondary" onclick="openTimer()">Workout timer</button></div>
  </div>
@@ -82,6 +90,21 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 
 <div class="card"><h3>Today</h3><div id="todayCard"></div></div>
  <div class="card"><h3>Readiness breakdown</h3><div class="grid" id="readinessBreakdown"></div></div>
+<div class="card">
+ <div class="row between"><h3>Training statistics</h3><button class="ghost" onclick="switchTab('stats')">View all</button></div>
+ <div class="grid" id="quickStats"></div>
+</div>
+<div class="card">
+ <h3>Tools</h3>
+ <div class="grid">
+  <button class="secondary" onclick="exportBackup()">Export backup</button>
+  <button class="secondary" onclick="document.getElementById('importFile').click()">Import backup</button>
+  <input id="importFile" type="file" accept=".json,application/json" class="hidden" onchange="importBackup(event)">
+  <button class="secondary" onclick="openGoalSetup()">Set ship-date goal</button>
+  <button class="secondary" onclick="showProgressionGuide()">Progression guide</button>
+ </div>
+</div>
+
  <div class="card"><h3>Achievements</h3><div id="achievements"></div></div>
 </section>
 
@@ -129,6 +152,18 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 
 <section id="calendar" class="hidden"><div class="card"><h2>52-week calendar</h2><p class="muted small">Green means all seven days recorded complete. Gold means partially complete.</p><div class="calendar" id="calendarGrid"></div></div></section>
 
+
+<section id="stats" class="hidden">
+ <div class="card hero">
+  <h2>Training statistics</h2>
+  <p class="muted small">Long-term consistency, performance records, workout volume, and readiness trends.</p>
+ </div>
+ <div class="card"><h3>Overview</h3><div class="grid" id="fullStats"></div></div>
+ <div class="card"><h3>Personal records</h3><div class="grid" id="personalRecords"></div></div>
+ <div class="card"><h3>Exercise progression</h3><div id="exerciseProgression"></div></div>
+ <div class="card"><h3>Readiness history</h3><canvas id="readinessChart" width="700" height="250"></canvas></div>
+</section>
+
 <section id="progress" class="hidden">
  <div class="card"><h2>Progress log</h2><div class="grid">
   <div class="metric"><label>Push-ups</label><input id="pushups" type="number"></div>
@@ -151,7 +186,8 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 <button data-tab="week" onclick="switchTab('week')"><span class="icon">✓</span>Week</button>
 <button data-tab="strength" onclick="switchTab('strength')"><span class="icon">▤</span>Strength</button>
 <button data-tab="calendar" onclick="switchTab('calendar')"><span class="icon">▦</span>Calendar</button>
-<button data-tab="progress" onclick="switchTab('progress')"><span class="icon">↗</span>Progress</button>
+<button data-tab="stats" onclick="switchTab('stats')"><span class="icon">◎</span>Stats</button>
+<button data-tab="progress" onclick="switchTab('progress')"><span class="icon">↗</span>Log</button>
 </div>
 
 <div id="demoModal" class="modal hidden" onclick="closeOnBackdrop(event,'demoModal')"><div class="sheet">
@@ -167,9 +203,50 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
   <div class="small muted" id="demoPhase">SETUP</div>
   <strong id="demoCurrentInstruction"></strong>
 </div>
+
+<div class="card" style="margin:12px 0;background:#102139">
+ <div class="small muted">AUTOMATIC RECOMMENDATION</div>
+ <strong id="weightRecommendation">Log this exercise to receive a recommendation.</strong>
+ <div class="small muted" id="lastExerciseLog" style="margin-top:5px"></div>
+</div>
+<div class="grid" style="margin:12px 0">
+ <button onclick="watchExerciseVideo()">Watch actual video</button>
+ <button class="secondary" onclick="openExerciseLog()">Log this exercise</button>
+</div>
+
 <h3>All steps</h3><ol class="steps" id="demoSteps"></ol>
 <h3>Key form cues</h3><div class="chips" id="demoCues"></div>
 <div class="notice small" style="margin-top:14px">These diagrams are simplified form guides. Start light and ask a qualified coach to check unfamiliar lifts. Stop for sharp or worsening pain, dizziness, chest pain, or unusual shortness of breath.</div>
+</div></div>
+
+
+<div id="exerciseLogModal" class="modal hidden" onclick="closeOnBackdrop(event,'exerciseLogModal')"><div class="sheet">
+ <div class="row between"><h2>Log exercise</h2><button class="ghost" onclick="closeModal('exerciseLogModal')">Close</button></div>
+ <h3 id="logExerciseName"></h3>
+ <div class="grid">
+  <div class="metric"><label>Weight used (lb)</label><input id="exerciseWeight" type="number" step="2.5" min="0"></div>
+  <div class="metric"><label>Sets completed</label><input id="exerciseSets" type="number" min="0"></div>
+  <div class="metric"><label>Reps per set</label><input id="exerciseReps" type="number" min="0"></div>
+  <div class="metric"><label>Difficulty / RPE (1–10)</label><input id="exerciseRPE" type="number" min="1" max="10"></div>
+  <div class="metric"><label>Pain (0–10)</label><input id="exercisePain" type="number" min="0" max="10"></div>
+ </div>
+ <label class="small muted" style="display:block;margin:12px 0 6px">Notes</label>
+ <textarea id="exerciseNotes" rows="3" placeholder="Form, soreness, which side, equipment used..."></textarea>
+ <button style="margin-top:12px" onclick="saveExerciseLog()">Save and calculate next recommendation</button>
+</div></div>
+
+<div id="goalModal" class="modal hidden" onclick="closeOnBackdrop(event,'goalModal')"><div class="sheet">
+ <div class="row between"><h2>Ship-date goal</h2><button class="ghost" onclick="closeModal('goalModal')">Close</button></div>
+ <p class="muted small">Enter an estimated date. You can change it later.</p>
+ <input id="shipDate" type="date">
+ <button style="margin-top:12px" onclick="saveShipDate()">Save date</button>
+</div></div>
+
+<div id="guideModal" class="modal hidden" onclick="closeOnBackdrop(event,'guideModal')"><div class="sheet">
+ <div class="row between"><h2>Automatic progression</h2><button class="ghost" onclick="closeModal('guideModal')">Close</button></div>
+ <div class="card"><strong>Increase</strong><p class="small muted">When all work is completed, pain is 0–2, and RPE is 7 or lower: usually add 2.5–5 lb for upper-body exercises or 5–10 lb for lower-body exercises.</p></div>
+ <div class="card"><strong>Hold steady</strong><p class="small muted">At RPE 8, or when form was merely acceptable: repeat the same weight and improve control.</p></div>
+ <div class="card"><strong>Reduce or modify</strong><p class="small muted">At RPE 9–10, missed repetitions, or pain above 2: reduce the weight or use an easier variation. Sharp or worsening pain should not be trained through.</p></div>
 </div></div>
 
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>
