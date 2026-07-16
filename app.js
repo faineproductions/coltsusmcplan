@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='6.7.1';
+const APP_VERSION='6.7.2';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -409,32 +409,69 @@ async function applyCloudBackup(backup,confirmFirst=false){
 }
 
 
-function modeKey(){return trainingMode==='normal'?'normal_'+currentWeek:trainingMode}
+function modeKey(){return trainingMode==='normal'?'normal_'+currentWeek:trainingMode+'_week_'+currentWeek}
 function activePlan(){
  if(trainingMode==='normal')return DATA.weeks[currentWeek];
  return DATA.trainingModes[trainingMode].days;
 }
 function activeModeInfo(){
  if(trainingMode==='normal')return {label:'Normal week',description:'Following the scheduled Year 1 progression for Week '+currentWeek+'.'};
- return DATA.trainingModes[trainingMode];
+ const info=DATA.trainingModes[trainingMode]||{label:'Alternate week',description:'Alternate training schedule.'};
+ return {
+  ...info,
+  description:info.description+' Progress is stored separately for Year 1 Week '+currentWeek+'.'
+ };
 }
 function setTrainingMode(mode){
  trainingMode=mode;localStorage.setItem('trainingMode',mode);
  document.querySelectorAll('.modeSelect').forEach(s=>s.value=mode);
  renderAll();
 }
-function stateStorageKey(){
- return trainingMode==='normal'?'mp_week_'+currentWeek:'mp_mode_'+trainingMode;
+function modeWeekKey(mode,w){
+ return 'mp_mode_'+mode+'_week_'+Number(w||currentWeek);
 }
-
+function stateStorageKey(){
+ return trainingMode==='normal'?'mp_week_'+currentWeek:modeWeekKey(trainingMode,currentWeek);
+}
 function wkKey(w){return 'mp_week_'+w}
+function readStoredState(key){
+ try{
+  const parsed=JSON.parse(localStorage.getItem(key)||'{}');
+  return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
+ }catch(error){
+  console.warn('Could not read workout state:',key,error);
+  return {};
+ }
+}
+function migrateLegacyModeState(mode,w){
+ const scopedKey=modeWeekKey(mode,w);
+ const scopedRaw=localStorage.getItem(scopedKey);
+ if(scopedRaw!==null)return readStoredState(scopedKey);
+
+ const legacyKey='mp_mode_'+mode;
+ const legacyRaw=localStorage.getItem(legacyKey);
+ const markerKey='mp_mode_'+mode+'_legacy_week';
+ const migratedWeek=Number(localStorage.getItem(markerKey)||0);
+
+ // Assign the old shared progress to only the first selected week after upgrading.
+ // Other weeks begin clean instead of inheriting the same checkmarks.
+ if(legacyRaw!==null && !migratedWeek){
+  const legacyState=readStoredState(legacyKey);
+  localStorage.setItem(scopedKey,JSON.stringify(legacyState));
+  localStorage.setItem(markerKey,String(w));
+  return legacyState;
+ }
+ return {};
+}
 function getWeekState(w){
- const key=trainingMode==='normal'?wkKey(w):'mp_mode_'+trainingMode;
- return JSON.parse(localStorage.getItem(key)||'{}')
+ const week=Number(w||currentWeek);
+ if(trainingMode==='normal')return readStoredState(wkKey(week));
+ return migrateLegacyModeState(trainingMode,week);
 }
 function putWeekState(w,s){
- const key=trainingMode==='normal'?wkKey(w):'mp_mode_'+trainingMode;
- localStorage.setItem(key,JSON.stringify(s))
+ const week=Number(w||currentWeek);
+ const key=trainingMode==='normal'?wkKey(week):modeWeekKey(trainingMode,week);
+ localStorage.setItem(key,JSON.stringify(s));
 }
 function progressHistory(){return JSON.parse(localStorage.getItem('mp_progress')||'[]')}
 
@@ -1194,9 +1231,33 @@ function drawReadinessChart(){
 function renderCalendar(){
  const g=document.getElementById('calendarGrid');g.innerHTML='';
  for(let w=1;w<=52;w++){
-  let ns=JSON.parse(localStorage.getItem('mp_week_'+w)||'{}');
-  let p=Math.round(DAYS.filter(day=>ns[day]).length/7*100);
-  let d=document.createElement('div');d.className='calday '+(p===100?'done':p>0?'partial':'')+(w===currentWeek?' today':'');d.textContent=w;d.onclick=()=>{trainingMode='normal';localStorage.setItem('trainingMode','normal');currentWeek=w;localStorage.setItem('currentWeek',w);renderAll();switchTab('week')};g.appendChild(d)}
+  const ns=readStoredState('mp_week_'+w);
+  const planWeek=DATA.weeks[w]||{};
+  let itemTotal=0,itemDone=0;
+  DAYS.forEach(day=>{
+   const count=Array.isArray(planWeek[day]?.exercises)?planWeek[day].exercises.length:0;
+   if(count){
+    itemTotal+=count;
+    itemDone+=completedItemCount(ns,day,count);
+   }else{
+    itemTotal+=1;
+    if(ns[day])itemDone+=1;
+   }
+  });
+  const p=itemTotal?Math.round(itemDone/itemTotal*100):0;
+  const d=document.createElement('div');
+  d.className='calday '+(p===100?'done':p>0?'partial':'')+(w===currentWeek?' today':'');
+  d.textContent=w;
+  d.onclick=()=>{
+   trainingMode='normal';
+   localStorage.setItem('trainingMode','normal');
+   currentWeek=w;
+   localStorage.setItem('currentWeek',w);
+   renderAll();
+   switchTab('week');
+  };
+  g.appendChild(d);
+ }
 }
 function openDemo(name,prescription){
  const e=DATA.exercises[name]||{category:'Exercise',steps:['Set up in a stable position.','Perform the movement slowly and under control.','Return to the start without losing form.'],cues:['Move pain-free'],animation:'default'};
@@ -1622,7 +1683,7 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
 window.addEventListener('online',()=>{setCloudDiagnostic('Internet connection restored.');retryCloudSync()});
 window.addEventListener('offline',()=>{setCloudStatus('Offline. Data is saved locally.','busy');setCloudDiagnostic('Cloud sync will resume when internet returns.');showCloudRetry(true)});
 renderAll();drawChart();initCloudSync();setTimeout(()=>{const e=document.getElementById('walkDate');if(e&&!e.value)e.value=new Date().toISOString().slice(0,10)},0);if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=671').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=672').then(reg=>reg.update()).catch(console.error);
 }
 
 

@@ -1,10 +1,8 @@
-const CACHE='marine-prep-pro-v6-7-1';
-const CORE=['./','./index.html','./app.js?v=671','./manifest.json?v=671','./icon.svg?v=671'];
+const CACHE='marine-prep-pro-v6-7-2';
+const CORE=['./','./index.html','./app.js?v=672','./manifest.json?v=672','./icon.svg?v=672'];
 
 self.addEventListener('install',event=>{
- event.waitUntil(
-  caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())
- );
+ event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
 
 self.addEventListener('activate',event=>{
@@ -23,19 +21,16 @@ self.addEventListener('fetch',event=>{
   return;
  }
 
- const isFreshAsset=
+ const networkFirst=
   event.request.mode==='navigate' ||
   url.pathname.endsWith('/app.js') ||
   url.pathname.endsWith('/index.html');
 
- if(isFreshAsset){
+ if(networkFirst){
   event.respondWith(
    fetch(event.request,{cache:'no-store'})
     .then(response=>{
-     if(response.ok){
-      const copy=response.clone();
-      caches.open(CACHE).then(cache=>cache.put(event.request,copy));
-     }
+     if(response.ok)caches.open(CACHE).then(cache=>cache.put(event.request,response.clone()));
      return response;
     })
     .catch(()=>caches.match(event.request).then(hit=>hit||caches.match('./index.html')))

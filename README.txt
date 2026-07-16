@@ -204,3 +204,11 @@ Version 6.7.1:
 - Added safe plan fallbacks and visible rendering-error notices.
 - Added a one-time display-cache cleanup.
 - Changed HTML and JavaScript fetching to network-first to prevent stale blank screens.
+
+Version 6.7.2:
+- Stores Hotel Week and every other alternate training mode separately for each selected Year 1 week.
+- Prevents Week 1 alternate-mode checkmarks from appearing in Week 2, Week 3, or later weeks.
+- Alternate-mode banners now state which Year 1 week owns the displayed progress.
+- Migrates the former shared alternate-mode record into only the first week opened after upgrading.
+- Keeps normal-week and cloud/local backup compatibility.
+- Calendar completion now reflects individual normal-week items.
