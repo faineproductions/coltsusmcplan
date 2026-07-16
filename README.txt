@@ -135,3 +135,15 @@ Version 5.7:
 - Added tap-to-edit for progress, exercise, walking, running, and test-day logs.
 - Saved entries reload into their original form and update in place.
 - Added edit status and cancel controls.
+
+Version 5.8:
+- Walking log now auto-loads saved values when a date is selected.
+- Selecting a date with an existing walking entry fills distance, time, steps, and notes.
+- Selecting a date with no saved entry clears the form for a new record.
+- Saving while an existing date is loaded updates that entry instead of duplicating it.
+
+Version 5.9:
+- Every dated log now loads saved values when its date is selected.
+- Added date selectors to progress and individual strength exercise logs.
+- Running and test-day dates now load matching entries directly.
+- Unused dates clear the form for new data; loaded dates update the existing record.
