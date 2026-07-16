@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='6.7.4';
+const APP_VERSION='6.7.5';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -1685,11 +1685,37 @@ async function renderPhotos(){const e=document.getElementById('photoGallery');if
 
 function trainingModeLabel(){return DATA.trainingModes[trainingMode]?.label||'Normal week'}
 
+function normalizeStartupState(){
+ const savedWeek=Number(localStorage.getItem('currentWeek'));
+ currentWeek=Number.isInteger(savedWeek)&&savedWeek>=1&&savedWeek<=52?savedWeek:1;
+ if(String(localStorage.getItem('currentWeek'))!==String(currentWeek)){
+  nativeStorageSetItem.call(localStorage,'currentWeek',String(currentWeek));
+ }
+
+ const availableModes=['normal',...Object.keys(DATA.trainingModes||{})];
+ const savedMode=localStorage.getItem('trainingMode')||'normal';
+ trainingMode=availableModes.includes(savedMode)?savedMode:'normal';
+ if(localStorage.getItem('trainingMode')!==trainingMode){
+  nativeStorageSetItem.call(localStorage,'trainingMode',trainingMode);
+ }
+}
 function renderAll(){
+ normalizeStartupState();
  applyPlannedMode();
  if(localStorage.getItem('mp_theme')==='light')document.body.classList.add('light');
- document.querySelectorAll('.modeSelect').forEach(s=>s.value=trainingMode);
- renderWeek();renderDashboard();renderStrengthLibrary();renderCalendar();renderSwimGates();renderSupplements();if(!document.getElementById('stats').classList.contains('hidden'))renderStats()
+ else document.body.classList.remove('light');
+ document.querySelectorAll('.modeSelect').forEach(control=>control.value=trainingMode);
+ if(sel)sel.value=currentWeek;
+
+ renderWeek();
+ renderDashboard();
+ renderStrengthLibrary();
+ renderCalendar();
+ renderSwimGates();
+ renderSupplements();
+
+ const stats=document.getElementById('stats');
+ if(stats&&!stats.classList.contains('hidden'))renderStats();
  renderCommandCenter();
 }
 if(localStorage.getItem('mp_last_version')!==APP_VERSION){
@@ -1701,21 +1727,88 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
  }
  nativeStorageSetItem.call(localStorage,'mp_last_version',APP_VERSION);
 }
-window.addEventListener('online',()=>{setCloudDiagnostic('Internet connection restored.');retryCloudSync()});
-window.addEventListener('offline',()=>{setCloudStatus('Offline. Data is saved locally.','busy');setCloudDiagnostic('Cloud sync will resume when internet returns.');showCloudRetry(true)});
-renderAll();drawChart();initCloudSync();setTimeout(()=>{const e=document.getElementById('walkDate');if(e&&!e.value)e.value=new Date().toISOString().slice(0,10)},0);if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=674').then(reg=>reg.update()).catch(console.error);
+window.addEventListener('online',()=>{
+ setCloudDiagnostic('Internet connection restored.');
+ retryCloudSync();
+});
+window.addEventListener('offline',()=>{
+ setCloudStatus('Offline. Data is saved locally.','busy');
+ setCloudDiagnostic('Cloud sync will resume when internet returns.');
+ showCloudRetry(true);
+});
+
+let appStartupComplete=false;
+let startupRenderTimer=null;
+
+function renderCurrentWorkoutNow(){
+ clearTimeout(startupRenderTimer);
+ try{
+  renderAll();
+  drawChart();
+ }catch(error){
+  console.error('Automatic workout loading failed:',error);
+ }
 }
 
+async function startMarinePrepApp(){
+ normalizeStartupState();
 
-(async function forceVersion671Refresh(){
+ // Draw immediately, then again after layout and restored storage have settled.
+ renderCurrentWorkoutNow();
+ requestAnimationFrame(()=>requestAnimationFrame(renderCurrentWorkoutNow));
+ startupRenderTimer=setTimeout(renderCurrentWorkoutNow,250);
+ setTimeout(renderCurrentWorkoutNow,1000);
+
+ const walkDateInput=document.getElementById('walkDate');
+ if(walkDateInput&&!walkDateInput.value){
+  walkDateInput.value=new Date().toISOString().slice(0,10);
+ }
+
+ if(!appStartupComplete){
+  appStartupComplete=true;
+  initCloudSync().finally(()=>{
+   // A restored Supabase session or cloud backup must always refresh Today and Week.
+   renderCurrentWorkoutNow();
+  });
+
+  if('serviceWorker' in navigator){
+   navigator.serviceWorker.register('sw.js?v=675')
+    .then(registration=>registration.update())
+    .catch(console.error);
+  }
+ }
+}
+
+if(document.readyState==='loading'){
+ document.addEventListener('DOMContentLoaded',startMarinePrepApp,{once:true});
+}else{
+ startMarinePrepApp();
+}
+
+// Safari and iPhone Home Screen apps may restore a frozen page without rerunning scripts.
+window.addEventListener('pageshow',event=>{
+ if(event.persisted)renderCurrentWorkoutNow();
+ else setTimeout(renderCurrentWorkoutNow,0);
+});
+
+// Refresh workouts whenever the installed app returns from the background.
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible')renderCurrentWorkoutNow();
+});
+window.addEventListener('focus',renderCurrentWorkoutNow);
+
+
+(async function forceVersion675Refresh(){
  try{
-  const key='mpp_display_cache_671';
+  const key='mpp_display_cache_675';
   if(localStorage.getItem(key))return;
-  localStorage.setItem(key,'1');
+  nativeStorageSetItem.call(localStorage,key,'1');
   if('caches' in window){
    const keys=await caches.keys();
-   await Promise.all(keys.filter(name=>name!=='marine-prep-pro-v6-7-1').map(name=>caches.delete(name)));
+   await Promise.all(keys.filter(name=>name!=='marine-prep-pro-v6-7-5').map(name=>caches.delete(name)));
   }
- }catch(error){console.warn('Cache cleanup skipped',error)}
+  setTimeout(renderCurrentWorkoutNow,50);
+ }catch(error){
+  console.warn('Cache cleanup skipped',error);
+ }
 })();

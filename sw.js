@@ -1,5 +1,5 @@
-const CACHE='marine-prep-pro-v6-7-4';
-const CORE=['./','./index.html','./app.js?v=674','./manifest.json?v=674','./icon.svg?v=674'];
+const CACHE='marine-prep-pro-v6-7-5';
+const CORE=['./','./index.html','./app.js?v=675','./manifest.json?v=675','./icon.svg?v=675'];
 
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
@@ -16,6 +16,7 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
  if(event.request.method!=='GET')return;
  const url=new URL(event.request.url);
+
  if(url.origin!==self.location.origin){
   event.respondWith(fetch(event.request));
   return;

@@ -225,3 +225,11 @@ Version 6.7.4:
 - Shows Connecting… and disables repeated taps during a connection attempt.
 - Restores the retry button automatically when the attempt finishes.
 - Manual retry does not erase or overwrite local training data.
+
+Version 6.7.5:
+- Automatically loads the saved current week, training mode, Week tab workouts, and today's Home workout when the site opens.
+- Replaces the one-shot startup render with a DOM-ready startup routine.
+- Renders again after layout, saved storage, and cloud session restoration settle.
+- Refreshes Today and Week when Safari restores the page from back-forward cache.
+- Refreshes workouts when the iPhone Home Screen app returns from the background or regains focus.
+- Validates saved week and training-mode values before rendering.
