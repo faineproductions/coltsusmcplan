@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Marine Prep Pro v5.6</title>
-<link rel="manifest" href="manifest.json?v=56">
+<title>Marine Prep Pro v5.7</title>
+<link rel="manifest" href="manifest.json?v=57">
 <style>
 :root{--bg:#07111f;--panel:#0e1b2e;--panel2:#13243a;--line:#243a56;--text:#f3f7fc;--muted:#9db0c8;--green:#4ade80;--yellow:#fbbf24;--red:#fb7185;--blue:#60a5fa;--safe:env(safe-area-inset-bottom)}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#06101d,#0a1525 45%,#07111f);color:var(--text);min-height:100vh}
@@ -112,10 +112,14 @@ body.light .ghost{color:var(--text)}
 
 
 .nav{grid-template-columns:repeat(4,1fr)}
+
+.editableLog{cursor:pointer;padding:10px 0;border-bottom:1px solid var(--line)}
+.editableLog:last-child{border-bottom:0}.editableLog:active{opacity:.72}
+.editableLog strong{color:var(--text)}.editHint{font-size:.75rem;color:var(--muted);margin-top:3px}
 </style>
 </head>
 <body>
-<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v5.6</span></h1><span class="badge">YEAR 1</span>
+<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v5.7</span></h1><span class="badge">YEAR 1</span>
 <button class="menuButton" aria-label="Open menu" onclick="toggleAppMenu(event)">
  <span></span><span></span><span></span>
 </button></div></div>
@@ -294,7 +298,9 @@ body.light .ghost{color:var(--text)}
   <div class="metric"><label>Tread minutes</label><input id="tread" type="number" step=".5"></div>
   <div class="metric"><label>Ruck miles</label><input id="ruckdist" type="number" step=".1"></div>
   <div class="metric"><label>Ruck weight lb</label><input id="ruckwt" type="number"></div>
- </div><button style="margin-top:12px" onclick="saveProgress()">Save progress entry</button></div>
+ </div><div id="progressEditStatus" class="small muted" style="margin-top:10px"></div>
+<div class="row" style="margin-top:12px"><button id="progressSaveButton" onclick="saveProgress()">Save progress entry</button><button id="progressCancelEdit" class="ghost hidden" onclick="cancelProgressEdit()">Cancel edit</button></div>
+<div id="progressEntryHistory" style="margin-top:12px"></div></div>
  <div class="card"><h3>Progress chart</h3><select id="chartMetric" onchange="drawChart()"><option value="pushups">Push-ups</option><option value="pullups">Pull-ups</option><option value="plank">Plank</option><option value="swimdist">Swim distance</option><option value="tread">Treading</option><option value="ruckdist">Ruck distance</option><option value="ruckwt">Ruck weight</option></select><canvas id="chart" width="700" height="250"></canvas></div>
  <div class="card"><h3>Swimming gates</h3><p class="muted small">Swimming advances independently from the rest of the program.</p><div id="swimGates"></div></div>
  <div class="card"><h3>Supplements</h3><div id="supplements"></div><div class="notice small" style="margin-top:12px">Because you use a GLP-1, review supplements and major increases in training with the clinician managing it.</div></div>
@@ -322,8 +328,7 @@ body.light .ghost{color:var(--text)}
   </div>
   <label class="small muted" style="display:block;margin-top:10px">Notes</label>
   <input id="walkNotes" placeholder="Campus, sightseeing, recovery walk, etc.">
-  <button style="margin-top:10px" onclick="saveWalkLog()">Save walking total</button>
-  <div id="walkSummary" style="margin-top:12px"></div>
+  <div id="walkEditStatus" class="small muted" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button id="walkSaveButton" onclick="saveWalkLog()">Save walking total</button><button id="walkCancelEdit" class="ghost hidden" onclick="cancelWalkEdit()">Cancel edit</button></div><div id="walkSummary" style="margin-top:12px"></div>
  </div>
 
 <div class="card">
@@ -334,8 +339,7 @@ body.light .ghost{color:var(--text)}
    <div class="metric"><label>Time</label><input id="runTime" placeholder="24:30"></div>
    <div class="metric"><label>Effort 1–10</label><input id="runEffort" type="number" min="1" max="10"></div>
   </div>
-  <button style="margin-top:10px" onclick="saveRunLog()">Save run</button>
-  <div id="runSummary" style="margin-top:12px"></div>
+  <div id="runEditStatus" class="small muted" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button id="runSaveButton" onclick="saveRunLog()">Save run</button><button id="runCancelEdit" class="ghost hidden" onclick="cancelRunEdit()">Cancel edit</button></div><div id="runSummary" style="margin-top:12px"></div>
   <div class="row" style="margin-top:10px"><button class="secondary" onclick="startRunInterval()">Run/walk timer</button><button class="ghost" onclick="stopRunInterval()">Stop timer</button></div>
   <div id="runTimerStatus" class="small muted" style="margin-top:8px"></div>
  </div>
@@ -364,8 +368,7 @@ body.light .ghost{color:var(--text)}
    <div class="metric"><label>Ruck miles</label><input id="testRuck" type="number" step=".1"></div>
    <div class="metric"><label>Ruck load</label><input id="testRuckWt" type="number"></div>
   </div>
-  <button style="margin-top:10px" onclick="saveTestDay()">Save complete assessment</button>
-  <div id="testHistory" style="margin-top:10px"></div>
+  <div id="testEditStatus" class="small muted" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button id="testSaveButton" onclick="saveTestDay()">Save complete assessment</button><button id="testCancelEdit" class="ghost hidden" onclick="cancelTestEdit()">Cancel edit</button></div><div id="testHistory" style="margin-top:10px"></div>
  </div>
 
  <div class="card">
@@ -472,7 +475,7 @@ body.light .ghost{color:var(--text)}
  </div>
  <label class="small muted" style="display:block;margin:12px 0 6px">Notes</label>
  <textarea id="exerciseNotes" rows="3" placeholder="Form, soreness, which side, equipment used..."></textarea>
- <button style="margin-top:12px" onclick="saveExerciseLog()">Save and calculate next recommendation</button>
+ <div id="exerciseEditStatus" class="small muted" style="margin-top:10px"></div><div class="row" style="margin-top:12px"><button id="exerciseSaveButton" onclick="saveExerciseLog()">Save and calculate next recommendation</button><button id="exerciseCancelEdit" class="ghost hidden" onclick="cancelExerciseEdit()">Cancel edit</button></div><h3 style="margin-top:16px">Recent entries</h3><div id="exerciseLogHistory"></div>
 </div></div>
 
 <div id="goalModal" class="modal hidden" onclick="closeOnBackdrop(event,'goalModal')"><div class="sheet">
@@ -522,5 +525,5 @@ body.light .ghost{color:var(--text)}
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=56"></script>
+<script src="app.js?v=57"></script>
 </body></html>

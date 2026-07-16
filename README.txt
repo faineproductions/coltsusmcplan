@@ -130,3 +130,8 @@ Version 5.6:
 - Added daily walking totals for distance, time, steps, and notes.
 - Added rolling 7-day walking totals.
 - Walking remains separate from run and ruck readiness scoring.
+
+Version 5.7:
+- Added tap-to-edit for progress, exercise, walking, running, and test-day logs.
+- Saved entries reload into their original form and update in place.
+- Added edit status and cancel controls.

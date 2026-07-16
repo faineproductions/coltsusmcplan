@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='5.6';
+const APP_VERSION='5.7';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -901,6 +901,13 @@ function exerciseDiagram(type,step,name){
 }
 function escapeSvg(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+let editingProgressIndex=null,editingExerciseIndex=null,editingWalkIndex=null,editingRunIndex=null,editingTestIndex=null;
+function setEditUI(prefix,index,label){
+ const editing=index!==null,status=document.getElementById(prefix+'EditStatus'),save=document.getElementById(prefix+'SaveButton'),cancel=document.getElementById(prefix+'CancelEdit');
+ if(status)status.textContent=editing?'Editing '+label+'. Saving will replace this entry.':'';
+ if(save)save.textContent=editing?'Update entry':({walk:'Save walking total',run:'Save run',test:'Save complete assessment',progress:'Save progress entry',exercise:'Save and calculate next recommendation'}[prefix]||'Save');
+ if(cancel)cancel.classList.toggle('hidden',!editing);
+}
 function exerciseLogs(){return JSON.parse(localStorage.getItem('mp_exercise_logs')||'[]')}
 function logsForExercise(name){return exerciseLogs().filter(x=>x.name===name)}
 function watchExerciseVideo(){
@@ -938,18 +945,18 @@ function renderExerciseRecommendation(name){
  document.getElementById('lastExerciseLog').textContent=last?('Last: '+(last.weight?formatWeight(+last.weight):'bodyweight')+', '+last.sets+' sets × '+last.reps+' reps, RPE '+last.rpe+', pain '+last.pain+'/10'):'No previous log.';
 }
 function openExerciseLog(){
- if(!activeDemo)return;
- activeExerciseLogName=activeDemo.name;
- document.getElementById('logExerciseName').textContent=activeExerciseLogName;
- const last=logsForExercise(activeExerciseLogName).slice(-1)[0];
- document.getElementById('exerciseWeight').value=last?.weight||'';
- document.getElementById('exerciseSets').value=last?.sets||'';
- document.getElementById('exerciseReps').value=last?.reps||'';
- document.getElementById('exerciseRPE').value='';
- document.getElementById('exercisePain').value='0';
- document.getElementById('exerciseNotes').value='';
- document.getElementById('exerciseLogModal').classList.remove('hidden');
+ if(!activeDemo)return;activeExerciseLogName=activeDemo.name;editingExerciseIndex=null;
+ logExerciseName.textContent=activeExerciseLogName;const last=logsForExercise(activeExerciseLogName).slice(-1)[0];
+ exerciseWeight.value=last?.weight||'';exerciseSets.value=last?.sets||'';exerciseReps.value=last?.reps||'';exerciseRPE.value='';exercisePain.value='0';exerciseNotes.value='';
+ setEditUI('exercise',null,'');renderExerciseLogHistory();exerciseLogModal.classList.remove('hidden');
 }
+function renderExerciseLogHistory(){
+ const el=document.getElementById('exerciseLogHistory');if(!el)return;
+ const rows=exerciseLogs().map((x,i)=>({...x,_index:i})).filter(x=>x.name===activeExerciseLogName).slice(-8).reverse();
+ el.innerHTML=rows.length?rows.map(x=>`<div class="editableLog" onclick="editExerciseLog(${x._index})"><strong>${new Date(x.date).toLocaleString()}</strong><div class="small muted">${x.weight?x.weight+' lb':'Bodyweight'} · ${x.sets||'—'} sets × ${x.reps||'—'} · RPE ${x.rpe||'—'} · pain ${x.pain||0}/10</div><div class="editHint">Tap to edit</div></div>`).join(''):'<div class="small muted">No saved entries for this exercise.</div>';
+}
+function editExerciseLog(i){const r=exerciseLogs()[i];if(!r)return;editingExerciseIndex=i;exerciseWeight.value=r.weight||'';exerciseSets.value=r.sets||'';exerciseReps.value=r.reps||'';exerciseRPE.value=r.rpe||'';exercisePain.value=r.pain||0;exerciseNotes.value=r.notes||'';setEditUI('exercise',i,new Date(r.date).toLocaleString())}
+function cancelExerciseEdit(){editingExerciseIndex=null;openExerciseLog()}
 function saveExerciseLog(){
  const entry={
   name:activeExerciseLogName,date:new Date().toISOString(),week:currentWeek,mode:trainingMode,
@@ -961,9 +968,11 @@ function saveExerciseLog(){
   notes:document.getElementById('exerciseNotes').value
  };
  if(!entry.rpe){alert('Enter an RPE from 1 to 10.');return}
- const logs=exerciseLogs();logs.push(entry);localStorage.setItem('mp_exercise_logs',JSON.stringify(logs));
+ const logs=exerciseLogs(),wasEditing=editingExerciseIndex!==null;
+ if(wasEditing){entry.date=logs[editingExerciseIndex]?.date||entry.date;logs[editingExerciseIndex]=entry}else logs.push(entry);
+ localStorage.setItem('mp_exercise_logs',JSON.stringify(logs));editingExerciseIndex=null;
  closeModal('exerciseLogModal');renderExerciseRecommendation(activeExerciseLogName);renderAll();
- alert(nextWeightRecommendation(entry).text);
+ alert((wasEditing?'Entry updated. ':'')+nextWeightRecommendation(entry).text);
 }
 function openGoalSetup(){
  document.getElementById('shipDate').value=localStorage.getItem('mp_ship_date')||'';
@@ -995,9 +1004,13 @@ function importBackup(event){
 
 function closeModal(id){document.getElementById(id).classList.add('hidden')}function closeOnBackdrop(e,id){if(e.target.id===id)closeModal(id)}
 function saveProgress(){
- let entry={date:new Date().toISOString(),week:currentWeek};['pushups','pullups','plank','run3','swimdist','tread','ruckdist','ruckwt'].forEach(id=>entry[id]=document.getElementById(id).value);
- let h=progressHistory();h.push(entry);localStorage.setItem('mp_progress',JSON.stringify(h));drawChart();renderAll();alert('Progress saved.');
+ const h=progressHistory(),entry={date:new Date().toISOString(),week:currentWeek};['pushups','pullups','plank','run3','swimdist','tread','ruckdist','ruckwt'].forEach(id=>entry[id]=document.getElementById(id).value);
+ const wasEditing=editingProgressIndex!==null;if(wasEditing){entry.date=h[editingProgressIndex]?.date||entry.date;entry.week=h[editingProgressIndex]?.week||currentWeek;h[editingProgressIndex]=entry}else h.push(entry);
+ localStorage.setItem('mp_progress',JSON.stringify(h));editingProgressIndex=null;cancelProgressEdit(false);drawChart();renderAll();alert(wasEditing?'Progress entry updated.':'Progress saved.');
 }
+function renderProgressEntryHistory(){const el=document.getElementById('progressEntryHistory');if(!el)return;const rows=progressHistory().map((x,i)=>({...x,_index:i})).slice(-8).reverse();el.innerHTML=rows.length?rows.map(x=>`<div class="editableLog" onclick="editProgressEntry(${x._index})"><strong>${new Date(x.date).toLocaleString()}</strong><div class="small muted">${x.pushups||0} push-ups · ${x.pullups||0} pull-ups · plank ${x.plank||0}s · run ${x.run3||'—'}</div><div class="editHint">Tap to edit</div></div>`).join(''):'<div class="small muted">No progress entries yet.</div>'}
+function editProgressEntry(i){const r=progressHistory()[i];if(!r)return;editingProgressIndex=i;['pushups','pullups','plank','run3','swimdist','tread','ruckdist','ruckwt'].forEach(id=>document.getElementById(id).value=r[id]||'');setEditUI('progress',i,new Date(r.date).toLocaleString())}
+function cancelProgressEdit(clear=true){editingProgressIndex=null;if(clear)['pushups','pullups','plank','run3','swimdist','tread','ruckdist','ruckwt'].forEach(id=>document.getElementById(id).value='');setEditUI('progress',null,'')}
 function drawChart(){
  const c=document.getElementById('chart'),ctx=c.getContext('2d'),m=document.getElementById('chartMetric').value,h=progressHistory().filter(x=>x[m]!==''&&x[m]!=null).slice(-20);
  ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle='#294764';ctx.lineWidth=1;for(let i=0;i<5;i++){let y=25+i*45;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(c.width-15,y);ctx.stroke()}
@@ -1032,7 +1045,7 @@ function renderCommandCenter(){
  el.innerHTML=`<div class="metric"><label>${todayName()} · ${trainingModeLabel()}</label><strong>${day?.title||'Rest / unscheduled'}</strong><div class="small muted">${day?.exercises?.length||0} planned items · ${completionForToday()?'Completed':'Not completed'}</div></div>
  ${plan?`<div class="commandAlert">Planned period active: <strong>${plan.label||plan.mode}</strong></div>`:''}
  ${warning?`<div class="commandAlert detailWarn">${warning}</div>`:''}`;
- renderWalkSummary();renderRunSummary();renderSwimConfidence();renderStandards();renderTestHistory();renderPlans();renderCheckpoints();renderSubstitutions();loadReminderReflection();renderPhotos();
+ renderWalkSummary();renderRunSummary();renderProgressEntryHistory();renderSwimConfidence();renderStandards();renderTestHistory();renderPlans();renderCheckpoints();renderSubstitutions();loadReminderReflection();renderPhotos();
 }
 function minimumWorkout(){
  alert('Minimum viable workout:\\n• 5-minute easy walk or march\\n• 2×10 calf raises\\n• 2×10 tibialis raises\\n• 2×30-sec hip-flexor stretch\\n• 5 slow breaths\\n\\nThis preserves the habit without trying to replace a full missed session.');
@@ -1067,48 +1080,28 @@ function showDeloadAdvice(){deloadRecommendation(true)}
 function parseClock(v){if(!v||!v.includes(':'))return 0;const p=v.split(':').map(Number);return p[0]*60+p[1]}
 
 function saveWalkLog(){
- const miles=Number(document.getElementById('walkMiles').value||0);
- const minutes=Number(document.getElementById('walkMinutes').value||0);
- const steps=Number(document.getElementById('walkSteps').value||0);
- if(!miles&&!minutes&&!steps){alert('Enter at least distance, time, or steps.');return}
- const rows=getJSON('mp_walk_logs',[]);
- rows.push({date:document.getElementById('walkDate').value||new Date().toISOString().slice(0,10),miles,minutes,steps,notes:document.getElementById('walkNotes').value.trim()});
- setJSON('mp_walk_logs',rows);
- document.getElementById('walkMiles').value='';
- document.getElementById('walkMinutes').value='';
- document.getElementById('walkSteps').value='';
- document.getElementById('walkNotes').value='';
- renderWalkSummary();
- alert('Walking total saved.');
+ const miles=Number(walkMiles.value||0),minutes=Number(walkMinutes.value||0),steps=Number(walkSteps.value||0);if(!miles&&!minutes&&!steps)return alert('Enter at least distance, time, or steps.');
+ const rows=getJSON('mp_walk_logs',[]),row={date:walkDate.value||new Date().toISOString().slice(0,10),miles,minutes,steps,notes:walkNotes.value.trim()},wasEditing=editingWalkIndex!==null;
+ if(wasEditing)rows[editingWalkIndex]=row;else rows.push(row);setJSON('mp_walk_logs',rows);editingWalkIndex=null;cancelWalkEdit();renderWalkSummary();alert(wasEditing?'Walking entry updated.':'Walking total saved.');
 }
+function editWalkLog(i){const r=getJSON('mp_walk_logs',[])[i];if(!r)return;editingWalkIndex=i;walkDate.value=r.date||'';walkMiles.value=r.miles||'';walkMinutes.value=r.minutes||'';walkSteps.value=r.steps||'';walkNotes.value=r.notes||'';setEditUI('walk',i,r.date)}
+function cancelWalkEdit(){editingWalkIndex=null;walkMiles.value='';walkMinutes.value='';walkSteps.value='';walkNotes.value='';setEditUI('walk',null,'')}
 function renderWalkSummary(){
- const el=document.getElementById('walkSummary');if(!el)return;
- const rows=getJSON('mp_walk_logs',[]);
- const today=new Date();const cutoff=new Date(today);cutoff.setDate(today.getDate()-6);
- const recent=rows.filter(r=>new Date(r.date+'T12:00:00')>=cutoff);
- const miles=recent.reduce((a,b)=>a+Number(b.miles||0),0);
- const minutes=recent.reduce((a,b)=>a+Number(b.minutes||0),0);
- const steps=recent.reduce((a,b)=>a+Number(b.steps||0),0);
- const last=rows[rows.length-1];
- el.innerHTML=`<div class="grid"><div class="metric"><label>Last 7 days</label><strong>${miles.toFixed(1)} mi</strong></div><div class="metric"><label>Walking time</label><strong>${minutes} min</strong></div><div class="metric"><label>Steps</label><strong>${steps.toLocaleString()}</strong></div></div>${last?`<div class="small muted" style="margin-top:8px">Latest: ${last.date}${last.notes?' · '+last.notes:''}</div>`:''}`;
+ const el=document.getElementById('walkSummary');if(!el)return;const rows=getJSON('mp_walk_logs',[]),today=new Date(),cutoff=new Date(today);cutoff.setDate(today.getDate()-6);
+ const recent=rows.filter(r=>new Date(r.date+'T12:00:00')>=cutoff),miles=recent.reduce((a,b)=>a+Number(b.miles||0),0),minutes=recent.reduce((a,b)=>a+Number(b.minutes||0),0),steps=recent.reduce((a,b)=>a+Number(b.steps||0),0),history=rows.map((x,i)=>({...x,_index:i})).slice(-10).reverse();
+ el.innerHTML=`<div class="grid"><div class="metric"><label>Last 7 days</label><strong>${miles.toFixed(1)} mi</strong></div><div class="metric"><label>Walking time</label><strong>${minutes} min</strong></div><div class="metric"><label>Steps</label><strong>${steps.toLocaleString()}</strong></div></div><h3 style="margin-top:14px">Saved days</h3>${history.length?history.map(x=>`<div class="editableLog" onclick="editWalkLog(${x._index})"><strong>${x.date}</strong><div class="small muted">${Number(x.miles||0).toFixed(2)} mi · ${x.minutes||0} min · ${(x.steps||0).toLocaleString()} steps${x.notes?' · '+x.notes:''}</div><div class="editHint">Tap to edit</div></div>`).join(''):'<div class="small muted">No walking entries yet.</div>'}`;
 }
-
 function saveRunLog(){
- const miles=Number(document.getElementById('runMiles').value),time=document.getElementById('runTime').value;
- if(!miles||!parseClock(time)){alert('Enter distance and a valid time such as 24:30.');return}
- const rows=getJSON('mp_run_logs',[]);
- rows.push({date:document.getElementById('runDate').value||new Date().toISOString().slice(0,10),miles,time,effort:Number(document.getElementById('runEffort').value||0)});
- setJSON('mp_run_logs',rows);renderRunSummary();alert('Run saved.');
+ const miles=Number(runMiles.value),time=runTime.value;if(!miles||!parseClock(time))return alert('Enter distance and a valid time such as 24:30.');
+ const rows=getJSON('mp_run_logs',[]),row={date:runDate.value||new Date().toISOString().slice(0,10),miles,time,effort:Number(runEffort.value||0)},wasEditing=editingRunIndex!==null;
+ if(wasEditing)rows[editingRunIndex]=row;else rows.push(row);setJSON('mp_run_logs',rows);editingRunIndex=null;cancelRunEdit();renderRunSummary();alert(wasEditing?'Run updated.':'Run saved.');
 }
+function editRunLog(i){const r=getJSON('mp_run_logs',[])[i];if(!r)return;editingRunIndex=i;runDate.value=r.date||'';runMiles.value=r.miles||'';runTime.value=r.time||'';runEffort.value=r.effort||'';setEditUI('run',i,r.date)}
+function cancelRunEdit(){editingRunIndex=null;runMiles.value='';runTime.value='';runEffort.value='';setEditUI('run',null,'')}
 function renderRunSummary(){
- const el=document.getElementById('runSummary');if(!el)return;
- const rows=getJSON('mp_run_logs',[]);
- const recent=rows.slice(-7),miles=recent.reduce((a,b)=>a+Number(b.miles||0),0);
- const last=rows[rows.length-1];
- let pace='—';if(last)pace=(parseClock(last.time)/last.miles).toFixed(1)+' min/mi';
- const prev=rows.slice(-14,-7).reduce((a,b)=>a+Number(b.miles||0),0);
- const jump=prev>0&&miles>prev*1.1;
- el.innerHTML=`<div class="grid"><div class="metric"><label>Recent 7 logged runs</label><strong>${miles.toFixed(1)} mi</strong></div><div class="metric"><label>Latest pace</label><strong>${pace}</strong></div><div class="metric"><label>25:00 3-mile target pace</label><strong>8.3 min/mi</strong></div></div>${jump?'<div class="commandAlert detailWarn">Mileage increased more than 10% compared with the previous seven logged runs. Do not automatically add more.</div>':''}`;
+ const el=document.getElementById('runSummary');if(!el)return;const rows=getJSON('mp_run_logs',[]),recent=rows.slice(-7),miles=recent.reduce((a,b)=>a+Number(b.miles||0),0),last=rows[rows.length-1];
+ let pace='—';if(last)pace=(parseClock(last.time)/last.miles).toFixed(1)+' min/mi';const prev=rows.slice(-14,-7).reduce((a,b)=>a+Number(b.miles||0),0),jump=prev>0&&miles>prev*1.1,history=rows.map((x,i)=>({...x,_index:i})).slice(-10).reverse();
+ el.innerHTML=`<div class="grid"><div class="metric"><label>Recent 7 logged runs</label><strong>${miles.toFixed(1)} mi</strong></div><div class="metric"><label>Latest pace</label><strong>${pace}</strong></div><div class="metric"><label>25:00 3-mile target pace</label><strong>8.3 min/mi</strong></div></div>${jump?'<div class="commandAlert detailWarn">Mileage increased more than 10% compared with the previous seven logged runs. Do not automatically add more.</div>':''}<h3 style="margin-top:14px">Saved runs</h3>${history.length?history.map(x=>`<div class="editableLog" onclick="editRunLog(${x._index})"><strong>${x.date}</strong><div class="small muted">${x.miles} mi · ${x.time} · RPE ${x.effort||'—'}</div><div class="editHint">Tap to edit</div></div>`).join(''):'<div class="small muted">No runs saved.</div>'}`;
 }
 let runTimerHandle=null,runTimerPhase=0,runTimerLeft=0;
 function startRunInterval(){
@@ -1131,11 +1124,13 @@ function renderStandards(){
  el.innerHTML=rows.map(r=>`<div class="detailLine"><strong>${r[0]}: ${r[1]}</strong><div class="small muted">Foundation ${r[2]} · Competitive ${r[3]} · 4-year target ${r[4]} · Remaining ${Math.max(0,r[4]-r[1])}</div></div>`).join('');
 }
 function saveTestDay(){
- const row={date:document.getElementById('testDate').value||new Date().toISOString().slice(0,10),pullups:+testPull.value||0,pushups:+testPush.value||0,plank:+testPlank.value||0,run3:testRun.value,swimdist:+testSwim.value||0,ruckdist:+testRuck.value||0,ruckwt:+testRuckWt.value||0};
- const rows=getJSON('mp_test_days',[]);rows.push(row);setJSON('mp_test_days',rows);
- const p=progressHistory();p.push(row);setJSON('mp_progress',p);renderAll();alert('Assessment saved together.');
+ const row={date:testDate.value||new Date().toISOString().slice(0,10),pullups:+testPull.value||0,pushups:+testPush.value||0,plank:+testPlank.value||0,run3:testRun.value,swimdist:+testSwim.value||0,ruckdist:+testRuck.value||0,ruckwt:+testRuckWt.value||0};
+ const rows=getJSON('mp_test_days',[]),wasEditing=editingTestIndex!==null;if(wasEditing)rows[editingTestIndex]=row;else rows.push(row);setJSON('mp_test_days',rows);
+ const p=progressHistory();p.push({...row,date:new Date(row.date+'T12:00:00').toISOString(),week:currentWeek});setJSON('mp_progress',p);editingTestIndex=null;cancelTestEdit();renderAll();alert(wasEditing?'Assessment updated.':'Assessment saved together.');
 }
-function renderTestHistory(){const e=document.getElementById('testHistory');if(!e)return;const rows=getJSON('mp_test_days',[]).slice(-5).reverse();e.innerHTML=rows.length?rows.map(x=>`<div class="detailLine"><strong>${x.date}</strong><div class="small muted">${x.pullups} pull-ups · ${x.pushups} push-ups · plank ${x.plank}s · run ${x.run3||'—'}</div></div>`).join(''):'<div class="small muted">No complete assessments saved.</div>'}
+function editTestDay(i){const r=getJSON('mp_test_days',[])[i];if(!r)return;editingTestIndex=i;testDate.value=r.date||'';testPull.value=r.pullups||'';testPush.value=r.pushups||'';testPlank.value=r.plank||'';testRun.value=r.run3||'';testSwim.value=r.swimdist||'';testRuck.value=r.ruckdist||'';testRuckWt.value=r.ruckwt||'';setEditUI('test',i,r.date)}
+function cancelTestEdit(){editingTestIndex=null;['testPull','testPush','testPlank','testRun','testSwim','testRuck','testRuckWt'].forEach(id=>document.getElementById(id).value='');setEditUI('test',null,'')}
+function renderTestHistory(){const e=document.getElementById('testHistory');if(!e)return;const rows=getJSON('mp_test_days',[]).map((x,i)=>({...x,_index:i})).slice(-8).reverse();e.innerHTML=rows.length?rows.map(x=>`<div class="editableLog" onclick="editTestDay(${x._index})"><strong>${x.date}</strong><div class="small muted">${x.pullups} pull-ups · ${x.pushups} push-ups · plank ${x.plank}s · run ${x.run3||'—'}</div><div class="editHint">Tap to edit</div></div>`).join(''):'<div class="small muted">No complete assessments saved.</div>'}
 
 function savePlan(){
  const start=planStart.value,end=planEnd.value;if(!start||!end){alert('Choose start and end dates.');return}
@@ -1197,5 +1192,5 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
  nativeStorageSetItem.call(localStorage,'mp_last_version',APP_VERSION);
 }
 renderAll();drawChart();initCloudSync();setTimeout(()=>{const e=document.getElementById('walkDate');if(e&&!e.value)e.value=new Date().toISOString().slice(0,10)},0);if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=56').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=57').then(reg=>reg.update()).catch(console.error);
 }
