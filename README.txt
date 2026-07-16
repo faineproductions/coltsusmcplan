@@ -173,3 +173,9 @@ Version 6.3:
 - Backdrop and Close controls now return reliably to the Strength Library.
 - Replaced YouTube search pages with one preselected direct instructional video for every exercise.
 - Shows the selected instructional channel beneath the video button.
+
+Version 6.4:
+- Removed long-form exercise tutorials.
+- Video buttons now open only quick YouTube Shorts-style demonstrations.
+- Exercises without a suitable short clip show no video rather than linking to a long or weak tutorial.
+- Renamed the button to Watch quick demo.
