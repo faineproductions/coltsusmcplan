@@ -153,3 +153,9 @@ Version 6.0:
 - The user stays inside the pinned Home Screen app and types the emailed code directly.
 - Avoids Safari opening the link and creating the session in the wrong browser context.
 - Existing Supabase cloud backups and accounts remain compatible.
+
+Version 6.1:
+- Cloud initialization now times out instead of hanging indefinitely.
+- Added Retry cloud connection button and diagnostic status.
+- Added online/offline detection and automatic retry when connectivity returns.
+- Added timeouts for Supabase session and backup requests.

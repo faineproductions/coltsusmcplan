@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='6.0';
+const APP_VERSION='6.1';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -17,6 +17,22 @@ let cloudSyncTimer=null;
 let cloudApplying=false;
 let cloudAutoSyncReady=false;
 let latestCloudRow=null;
+
+let cloudInitAttempt=0;
+function withTimeout(promise,ms,label='Operation'){
+ return Promise.race([
+  promise,
+  new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+' timed out after '+Math.round(ms/1000)+' seconds.')),ms))
+ ]);
+}
+function setCloudDiagnostic(message=''){
+ const el=document.getElementById('cloudDiagnostic');if(el)el.textContent=message;
+}
+function showCloudRetry(show=true){document.getElementById('cloudRetryButton')?.classList.toggle('hidden',!show)}
+async function retryCloudSync(){
+ showCloudRetry(false);setCloudDiagnostic('Retrying connection…');
+ await initCloudSync(true);
+}
 
 function isAppDataKey(key){
  return key.startsWith('mp_') || key==='currentWeek' || key==='trainingMode';
@@ -91,27 +107,44 @@ Storage.prototype.setItem=function(key,value){
  }
 };
 
-async function initCloudSync(){
+async function initCloudSync(forceRetry=false){
+ cloudInitAttempt++;
+ const attempt=cloudInitAttempt;
+ showCloudRetry(false);
+ setCloudDiagnostic('Connection attempt '+attempt+'…');
+ if(!navigator.onLine){
+  setCloudStatus('Offline. Data is saved locally.','busy');
+  setCloudDiagnostic('Connect to the internet, then retry.');
+  showCloudRetry(true);
+  return;
+ }
  if(!window.supabase || !window.supabase.createClient){
-  setCloudStatus('Cloud library could not load. Local saves still work.','error');
+  setCloudStatus('Cloud library did not load. Local saves still work.','error');
+  setCloudDiagnostic('The Supabase browser library was blocked or unavailable.');
+  showCloudRetry(true);
   return;
  }
  try{
-  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
-   auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}
-  });
-  const {data,error}=await supabaseClient.auth.getSession();
-  if(error)throw error;
-  await handleCloudSession(data.session);
-  supabaseClient.auth.onAuthStateChange((_event,session)=>{
-   setTimeout(()=>handleCloudSession(session),0);
-  });
+  if(!supabaseClient || forceRetry){
+   supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+    auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}
+   });
+  }
+  const result=await withTimeout(supabaseClient.auth.getSession(),12000,'Supabase session check');
+  if(result.error)throw result.error;
+  setCloudDiagnostic('Supabase connection established.');
+  await withTimeout(handleCloudSession(result.data.session),15000,'Cloud backup check');
+  if(!window.__mppAuthListenerAttached){
+   window.__mppAuthListenerAttached=true;
+   supabaseClient.auth.onAuthStateChange((_event,session)=>setTimeout(()=>handleCloudSession(session),0));
+  }
  }catch(error){
   console.error(error);
-  setCloudStatus('Cloud setup error. Local saves still work.','error');
+  setCloudStatus('Cloud connection failed. Local saves still work.','error');
+  setCloudDiagnostic(error.message||'Unknown cloud connection error.');
+  showCloudRetry(true);
  }
 }
-
 async function handleCloudSession(session){
  cloudUser=session?.user||null;
  cloudAutoSyncReady=false;
@@ -204,11 +237,12 @@ async function cloudSignOut(){
 }
 
 async function fetchCloudBackup(){
- const {data,error}=await supabaseClient
+ const request=supabaseClient
   .from('app_backups')
   .select('backup_data,app_version,updated_at')
   .eq('user_id',cloudUser.id)
   .maybeSingle();
+ const {data,error}=await withTimeout(request,12000,'Cloud backup request');
  if(error)throw error;
  latestCloudRow=data||null;
  return latestCloudRow;
@@ -1256,6 +1290,8 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
  }
  nativeStorageSetItem.call(localStorage,'mp_last_version',APP_VERSION);
 }
+window.addEventListener('online',()=>{setCloudDiagnostic('Internet connection restored.');retryCloudSync()});
+window.addEventListener('offline',()=>{setCloudStatus('Offline. Data is saved locally.','busy');setCloudDiagnostic('Cloud sync will resume when internet returns.');showCloudRetry(true)});
 renderAll();drawChart();initCloudSync();setTimeout(()=>{const e=document.getElementById('walkDate');if(e&&!e.value)e.value=new Date().toISOString().slice(0,10)},0);if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=60').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=61').then(reg=>reg.update()).catch(console.error);
 }
