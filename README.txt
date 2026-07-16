@@ -197,3 +197,10 @@ Version 6.6:
 Version 6.7:
 - Fixed blank Today and Week exercise lists caused by a missing HTML escaping helper.
 - Preserved individual exercise checkboxes and recommended rest formatting.
+
+Version 6.7.1:
+- Rebuilt Today and Week exercise rendering with direct DOM elements instead of fragile HTML strings.
+- Restored all exercises, individual checkboxes, demos, and set/rep/rest labels.
+- Added safe plan fallbacks and visible rendering-error notices.
+- Added a one-time display-cache cleanup.
+- Changed HTML and JavaScript fetching to network-first to prevent stale blank screens.

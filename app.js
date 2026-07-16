@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='6.7';
+const APP_VERSION='6.7.1';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -572,15 +572,61 @@ function setWholeDayComplete(day,checked){
  putWeekState(currentWeek,state);
  renderAll();
 }
-function itemCheckHtml(day,e,index,state,label=''){
- const checked=getItemCompletion(state,day,index,(activePlan()[day]?.exercises||[]).length);
- return `<div class="itemCheckRow ${checked?'completed':''}">
-  <input class="itemCheck" type="checkbox" ${checked?'checked':''} aria-label="Mark ${escapeHtml(e.name)} complete" onclick="event.stopPropagation()" onchange="setWorkoutItemComplete(${JSON.stringify(day)},${index},this.checked)">
-  <div class="exercise" onclick='openDemo(${JSON.stringify(e.name)},${JSON.stringify(e.prescription)})'>
-   <div><strong>${escapeHtml(e.name)}</strong><span class="small muted">${escapeHtml(formatPrescription(e.name,e.prescription))}</span></div>
-   <span class="tap">${label||'Demo ›'}</span>
-  </div>
- </div>`;
+function safePlanDay(day){
+ const planWeek=activePlan()||{};
+ const raw=planWeek[day]||{};
+ return {
+  title:String(raw.title||'Planned training'),
+  exercises:Array.isArray(raw.exercises)?raw.exercises.filter(Boolean):[]
+ };
+}
+function buildExerciseRow(day,exercise,index,state,label='Demo ›'){
+ const e=exercise||{};
+ const row=document.createElement('div');
+ const checked=getItemCompletion(state,day,index,safePlanDay(day).exercises.length);
+ row.className='itemCheckRow'+(checked?' completed':'');
+
+ const box=document.createElement('input');
+ box.className='itemCheck';
+ box.type='checkbox';
+ box.checked=checked;
+ box.setAttribute('aria-label','Mark '+String(e.name||'exercise')+' complete');
+ box.addEventListener('click',event=>event.stopPropagation());
+ box.addEventListener('change',()=>setWorkoutItemComplete(day,index,box.checked));
+
+ const card=document.createElement('div');
+ card.className='exercise';
+ card.setAttribute('role','button');
+ card.tabIndex=0;
+
+ const text=document.createElement('div');
+ const strong=document.createElement('strong');
+ strong.textContent=String(e.name||'Exercise');
+ const prescription=document.createElement('span');
+ prescription.className='small muted';
+ prescription.textContent=formatPrescription(e.name,e.prescription);
+ text.append(strong,prescription);
+
+ const demo=document.createElement('span');
+ demo.className='tap';
+ demo.textContent=label;
+
+ const open=()=>{
+  if(typeof openDemo==='function')openDemo(String(e.name||'Exercise'),String(e.prescription||''));
+ };
+ card.addEventListener('click',open);
+ card.addEventListener('keydown',event=>{
+  if(event.key==='Enter'||event.key===' '){event.preventDefault();open()}
+ });
+
+ card.append(text,demo);
+ row.append(box,card);
+ return row;
+}
+function appendExerciseRows(parent,day,exercises,state,label){
+ exercises.forEach((exercise,index)=>{
+  parent.appendChild(buildExerciseRow(day,exercise,index,state,label));
+ });
 }
 
 function pctForWeek(w){
@@ -600,62 +646,167 @@ function pctForWeek(w){
  return itemTotal?Math.round(itemDone/itemTotal*100):0;
 }
 function renderWeek(){
- sel.value=currentWeek;
- const container=document.getElementById('weekDays');container.innerHTML='';
- const planWeek=activePlan();
- const state=getWeekState(currentWeek);
- document.querySelectorAll('.modeSelect').forEach(s=>s.value=trainingMode);
- document.getElementById('normalWeekControl').style.display=trainingMode==='normal'?'block':'none';
- const info=activeModeInfo();
- document.getElementById('modeBannerWeek').innerHTML='<span class="modePill">'+info.label.toUpperCase()+'</span>'+info.description;
+ try{
+  if(sel)sel.value=currentWeek;
+  const container=document.getElementById('weekDays');
+  if(!container)return;
+  container.replaceChildren();
 
- DAYS.forEach(day=>{
-   const plan=planWeek[day];
+  const state=getWeekState(currentWeek);
+  document.querySelectorAll('.modeSelect').forEach(control=>control.value=trainingMode);
+  const normalControl=document.getElementById('normalWeekControl');
+  if(normalControl)normalControl.style.display=trainingMode==='normal'?'block':'none';
+
+  const info=activeModeInfo();
+  const banner=document.getElementById('modeBannerWeek');
+  if(banner)banner.innerHTML='<span class="modePill">'+info.label.toUpperCase()+'</span>'+info.description;
+
+  DAYS.forEach(day=>{
+   const plan=safePlanDay(day);
    const itemTotal=plan.exercises.length;
    const itemDone=completedItemCount(state,day,itemTotal);
    const dayChecked=itemTotal?itemDone===itemTotal:!!state[day];
-   const wrap=document.createElement('div');wrap.className='day';
-   const exHtml=plan.exercises.map((e,i)=>itemCheckHtml(day,e,i,state,'View demo ›')).join('');
-   wrap.innerHTML=`<div class="dayhead">
-    <input class="check" type="checkbox" ${dayChecked?'checked':''} aria-label="Mark all of ${day} complete">
-    <div style="flex:1">
-     <strong>${day}</strong>
-     <div class="small muted">${plan.title}</div>
-     <div class="small muted dayProgressText">${itemTotal?itemDone+' of '+itemTotal+' items checked':'Recovery/rest day'}</div>
-     ${exHtml||'<div class="small muted" style="margin-top:7px">Check the day when your recovery or rest work is complete.</div>'}
-    </div>
-   </div>`;
-   wrap.querySelector('.check').onchange=e=>setWholeDayComplete(day,e.target.checked);
+
+   const wrap=document.createElement('div');
+   wrap.className='day';
+
+   const head=document.createElement('div');
+   head.className='dayhead';
+
+   const wholeDay=document.createElement('input');
+   wholeDay.className='check';
+   wholeDay.type='checkbox';
+   wholeDay.checked=dayChecked;
+   wholeDay.setAttribute('aria-label','Mark all of '+day+' complete');
+   wholeDay.addEventListener('change',()=>setWholeDayComplete(day,wholeDay.checked));
+
+   const content=document.createElement('div');
+   content.style.flex='1';
+
+   const dayName=document.createElement('strong');
+   dayName.textContent=day;
+
+   const title=document.createElement('div');
+   title.className='small muted';
+   title.textContent=plan.title;
+
+   const progress=document.createElement('div');
+   progress.className='small muted dayProgressText';
+   progress.textContent=itemTotal
+    ? itemDone+' of '+itemTotal+' items checked'
+    : 'Recovery/rest day';
+
+   content.append(dayName,title,progress);
+
+   if(itemTotal){
+    appendExerciseRows(content,day,plan.exercises,state,'View demo ›');
+   }else{
+    const note=document.createElement('div');
+    note.className='small muted';
+    note.style.marginTop='7px';
+    note.textContent='Check the day when your recovery or rest work is complete.';
+    content.appendChild(note);
+   }
+
+   head.append(wholeDay,content);
+   wrap.appendChild(head);
    container.appendChild(wrap);
- });
- ['sleep','energy','pain','weight','notes'].forEach(id=>document.getElementById(id).value=state[id]||'');
- const p=pctForWeek(currentWeek);
- document.getElementById('weekBar').style.width=p+'%';
- document.getElementById('weekPct').textContent=p+'% of individual items recorded complete';
+  });
+
+  ['sleep','energy','pain','weight','notes'].forEach(id=>{
+   const input=document.getElementById(id);
+   if(input)input.value=state[id]||'';
+  });
+
+  const percent=pctForWeek(currentWeek);
+  const bar=document.getElementById('weekBar');
+  const pct=document.getElementById('weekPct');
+  if(bar)bar.style.width=percent+'%';
+  if(pct)pct.textContent=percent+'% of individual items recorded complete';
+ }catch(error){
+  console.error('Week rendering failed:',error);
+  const container=document.getElementById('weekDays');
+  if(container){
+   container.innerHTML='<div class="notice">The weekly exercises could not be drawn. Reload v6.7.1 once. If this message remains, open the hamburger menu and use Reset display cache.</div>';
+  }
+ }
 }
 function saveCheckin(){let s=getWeekState(currentWeek);['sleep','energy','pain','weight','notes','painLocation'].forEach(id=>{const e=document.getElementById(id);if(e)s[id]=e.value});putWeekState(currentWeek,s);renderAll();alert('Check-in saved.')}
 
 function todayName(){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]}
 function renderDashboard(){
- const p=pctForWeek(currentWeek);
- const info=activeModeInfo();
- document.querySelectorAll('.modeSelect').forEach(s=>s.value=trainingMode);
- document.getElementById('modeBannerHome').innerHTML='<span class="modePill">'+info.label.toUpperCase()+'</span>'+info.description;
- document.getElementById('heroWeek').textContent=trainingMode==='normal'?'Week '+currentWeek:info.label;
- document.getElementById('heroBar').style.width=p+'%';
- document.getElementById('heroPct').textContent=p+'% of individual items recorded complete';
- const day=todayName(), plan=activePlan()[day], state=getWeekState(currentWeek);
- const todayItemTotal=plan.exercises.length;
- const todayItemDone=completedItemCount(state,day,todayItemTotal);
- const allDone=todayItemTotal?todayItemDone===todayItemTotal:!!state[day];
- const ex=plan.exercises.map((e,i)=>itemCheckHtml(day,e,i,state,'Demo ›')).join('');
- document.getElementById('todayCard').innerHTML=`
-  <div class="row between">
-   <div><strong>${day}</strong><div class="small muted">${plan.title}</div></div>
-   <span class="badge">${allDone?'Complete':todayItemDone?'In progress':'Planned'}</span>
-  </div>
-  <div class="small muted todayProgress">${todayItemTotal?todayItemDone+' of '+todayItemTotal+' items checked':'Recovery or rest day'}</div>
-  ${ex||`<label class="itemCheckRow"><input class="itemCheck" type="checkbox" ${allDone?'checked':''} onchange="setWholeDayComplete(${JSON.stringify(day)},this.checked)"><span>${allDone?'Recovery/rest recorded complete':'Mark recovery/rest complete'}</span></label>`}`;
+ try{
+  const percent=pctForWeek(currentWeek);
+  const info=activeModeInfo();
+  document.querySelectorAll('.modeSelect').forEach(control=>control.value=trainingMode);
+
+  const homeBanner=document.getElementById('modeBannerHome');
+  if(homeBanner)homeBanner.innerHTML='<span class="modePill">'+info.label.toUpperCase()+'</span>'+info.description;
+
+  const heroWeek=document.getElementById('heroWeek');
+  const heroBar=document.getElementById('heroBar');
+  const heroPct=document.getElementById('heroPct');
+  if(heroWeek)heroWeek.textContent=trainingMode==='normal'?'Week '+currentWeek:info.label;
+  if(heroBar)heroBar.style.width=percent+'%';
+  if(heroPct)heroPct.textContent=percent+'% of individual items recorded complete';
+
+  const day=todayName();
+  const plan=safePlanDay(day);
+  const state=getWeekState(currentWeek);
+  const itemTotal=plan.exercises.length;
+  const itemDone=completedItemCount(state,day,itemTotal);
+  const allDone=itemTotal?itemDone===itemTotal:!!state[day];
+
+  const card=document.getElementById('todayCard');
+  if(card){
+   card.replaceChildren();
+
+   const top=document.createElement('div');
+   top.className='row between';
+
+   const heading=document.createElement('div');
+   const dayName=document.createElement('strong');
+   dayName.textContent=day;
+   const title=document.createElement('div');
+   title.className='small muted';
+   title.textContent=plan.title;
+   heading.append(dayName,title);
+
+   const badge=document.createElement('span');
+   badge.className='badge';
+   badge.textContent=allDone?'Complete':itemDone?'In progress':'Planned';
+
+   top.append(heading,badge);
+
+   const progress=document.createElement('div');
+   progress.className='small muted todayProgress';
+   progress.textContent=itemTotal
+    ? itemDone+' of '+itemTotal+' items checked'
+    : 'Recovery or rest day';
+
+   card.append(top,progress);
+
+   if(itemTotal){
+    appendExerciseRows(card,day,plan.exercises,state,'Demo ›');
+   }else{
+    const label=document.createElement('label');
+    label.className='itemCheckRow';
+    const box=document.createElement('input');
+    box.className='itemCheck';
+    box.type='checkbox';
+    box.checked=allDone;
+    box.addEventListener('change',()=>setWholeDayComplete(day,box.checked));
+    const text=document.createElement('span');
+    text.textContent=allDone?'Recovery/rest recorded complete':'Mark recovery/rest complete';
+    label.append(box,text);
+    card.appendChild(label);
+   }
+  }
+ }catch(error){
+  console.error('Today rendering failed:',error);
+  const card=document.getElementById('todayCard');
+  if(card)card.innerHTML='<div class="notice">Today’s exercises could not be drawn. Reload v6.7.1 once.</div>';
+ }
  let scores=readiness();
  let total100=Math.round((scores.consistency+scores.strength+scores.endurance+scores.swimming+scores.rucking+scores.recovery)/6);
  let total=total100*10;
@@ -1471,5 +1622,18 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
 window.addEventListener('online',()=>{setCloudDiagnostic('Internet connection restored.');retryCloudSync()});
 window.addEventListener('offline',()=>{setCloudStatus('Offline. Data is saved locally.','busy');setCloudDiagnostic('Cloud sync will resume when internet returns.');showCloudRetry(true)});
 renderAll();drawChart();initCloudSync();setTimeout(()=>{const e=document.getElementById('walkDate');if(e&&!e.value)e.value=new Date().toISOString().slice(0,10)},0);if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=67').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=671').then(reg=>reg.update()).catch(console.error);
 }
+
+
+(async function forceVersion671Refresh(){
+ try{
+  const key='mpp_display_cache_671';
+  if(localStorage.getItem(key))return;
+  localStorage.setItem(key,'1');
+  if('caches' in window){
+   const keys=await caches.keys();
+   await Promise.all(keys.filter(name=>name!=='marine-prep-pro-v6-7-1').map(name=>caches.delete(name)));
+  }
+ }catch(error){console.warn('Cache cleanup skipped',error)}
+})();

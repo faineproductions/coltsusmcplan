@@ -1,14 +1,54 @@
-const CACHE='marine-prep-pro-v6-7';
-const CORE=['./','./index.html','./app.js?v=67','./manifest.json?v=67','./icon.svg?v=67'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>{
- if(e.request.method!=='GET')return;
- const u=new URL(e.request.url);
- if(u.origin!==self.location.origin){e.respondWith(fetch(e.request));return}
- if(e.request.mode==='navigate'){
-  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(x=>x.put('./index.html',c));return r}).catch(()=>caches.match('./index.html')));
+const CACHE='marine-prep-pro-v6-7-1';
+const CORE=['./','./index.html','./app.js?v=671','./manifest.json?v=671','./icon.svg?v=671'];
+
+self.addEventListener('install',event=>{
+ event.waitUntil(
+  caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())
+ );
+});
+
+self.addEventListener('activate',event=>{
+ event.waitUntil(
+  caches.keys()
+   .then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))
+   .then(()=>self.clients.claim())
+ );
+});
+
+self.addEventListener('fetch',event=>{
+ if(event.request.method!=='GET')return;
+ const url=new URL(event.request.url);
+ if(url.origin!==self.location.origin){
+  event.respondWith(fetch(event.request));
   return;
  }
- e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request).then(r=>{if(r.ok)caches.open(CACHE).then(x=>x.put(e.request,r.clone()));return r})));
+
+ const isFreshAsset=
+  event.request.mode==='navigate' ||
+  url.pathname.endsWith('/app.js') ||
+  url.pathname.endsWith('/index.html');
+
+ if(isFreshAsset){
+  event.respondWith(
+   fetch(event.request,{cache:'no-store'})
+    .then(response=>{
+     if(response.ok){
+      const copy=response.clone();
+      caches.open(CACHE).then(cache=>cache.put(event.request,copy));
+     }
+     return response;
+    })
+    .catch(()=>caches.match(event.request).then(hit=>hit||caches.match('./index.html')))
+  );
+  return;
+ }
+
+ event.respondWith(
+  caches.match(event.request).then(hit=>
+   hit||fetch(event.request).then(response=>{
+    if(response.ok)caches.open(CACHE).then(cache=>cache.put(event.request,response.clone()));
+    return response;
+   })
+  )
+ );
 });
