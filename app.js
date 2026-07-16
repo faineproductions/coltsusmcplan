@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='4.6';
+const APP_VERSION='5.1';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -369,7 +369,7 @@ function renderWeek(){
  ['sleep','energy','pain','weight','notes'].forEach(id=>document.getElementById(id).value=state[id]||'');
  const p=pctForWeek(currentWeek);document.getElementById('weekBar').style.width=p+'%';document.getElementById('weekPct').textContent=p+'% recorded complete';
 }
-function saveCheckin(){let s=getWeekState(currentWeek);['sleep','energy','pain','weight','notes'].forEach(id=>s[id]=document.getElementById(id).value);putWeekState(currentWeek,s);renderAll();alert('Check-in saved.')}
+function saveCheckin(){let s=getWeekState(currentWeek);['sleep','energy','pain','weight','notes','painLocation'].forEach(id=>{const e=document.getElementById(id);if(e)s[id]=e.value});putWeekState(currentWeek,s);renderAll();alert('Check-in saved.')}
 
 function todayName(){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]}
 function renderDashboard(){
@@ -493,7 +493,7 @@ function readinessExplanation(category,score,latest,weekState){
    reason:'This estimates whether your current sleep and pain levels support productive training. Poor recovery can limit every other category even when fitness is improving.',
    inputs:[
     {label:'Average sleep this week',value:sleep?sleep+' hours':'No sleep average saved'},
-    {label:'Pain this week',value:(weekState.pain!==undefined&&weekState.pain!=='')?pain+'/10':'No pain rating saved'}
+    {label:'Pain this week',value:(weekState.pain!==undefined&&weekState.pain!=='')?pain+'/10'+(weekState.painLocation?' · '+weekState.painLocation:''):'No pain rating saved'}
    ],
    strengths:[],
    weaknesses:[],
@@ -969,10 +969,158 @@ function renderSupplements(){
  document.querySelectorAll('.supp').forEach(e=>e.onchange=()=>{st[e.dataset.id]=e.checked;localStorage.setItem('mp_supp',JSON.stringify(st))})
 }
 function openTimer(){document.getElementById('timerModal').classList.remove('hidden')}function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}function timerRender(){document.getElementById('timerText').textContent=fmt(timerSeconds)}function setTimer(s){timerPause();timerSeconds=s;timerRender()}function timerStart(){if(timerHandle)return;timerHandle=setInterval(()=>{if(timerSeconds>0){timerSeconds--;timerRender()}else{timerPause();navigator.vibrate&&navigator.vibrate([200,100,200]);alert('Timer complete.')}},1000)}function timerPause(){clearInterval(timerHandle);timerHandle=null}function timerReset(){timerPause();timerSeconds=0;timerRender()}
+
+function getJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch{return fallback}}
+function setJSON(key,value){localStorage.setItem(key,JSON.stringify(value))}
+function todayName(){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]}
+function currentDayPlan(){const mode=DATA.trainingModes[trainingMode];return trainingMode==='normal'?DATA.weeks[currentWeek-1].days[todayName()]:mode?.days?.[todayName()]}
+function completionForToday(){const key=trainingMode==='normal'?'mp_week_'+currentWeek:'mp_mode_'+trainingMode;const s=getJSON(key,{});return !!s[todayName()]}
+
+function renderCommandCenter(){
+ const el=document.getElementById('commandToday'); if(!el)return;
+ const day=currentDayPlan();
+ const plan=getActivePlan();
+ const check=getJSON('mp_week_'+currentWeek,{});
+ const warning=deloadRecommendation(false);
+ el.innerHTML=`<div class="metric"><label>${todayName()} · ${trainingModeLabel()}</label><strong>${day?.title||'Rest / unscheduled'}</strong><div class="small muted">${day?.exercises?.length||0} planned items · ${completionForToday()?'Completed':'Not completed'}</div></div>
+ ${plan?`<div class="commandAlert">Planned period active: <strong>${plan.label||plan.mode}</strong></div>`:''}
+ ${warning?`<div class="commandAlert detailWarn">${warning}</div>`:''}`;
+ renderRunSummary();renderSwimConfidence();renderStandards();renderTestHistory();renderPlans();renderCheckpoints();renderSubstitutions();loadReminderReflection();renderPhotos();
+}
+function minimumWorkout(){
+ alert('Minimum viable workout:\\n• 5-minute easy walk or march\\n• 2×10 calf raises\\n• 2×10 tibialis raises\\n• 2×30-sec hip-flexor stretch\\n• 5 slow breaths\\n\\nThis preserves the habit without trying to replace a full missed session.');
+}
+function missedWorkout(){
+ const choice=prompt('Type one option:\\nSKIP = intentionally skip\\nMOVE = move today’s session to tomorrow in your notes\\nRECOVERY = switch to Recovery Week\\nCONTINUE = continue without making it up','CONTINUE');
+ if(!choice)return;
+ const c=choice.toUpperCase();
+ if(c==='RECOVERY')setTrainingMode('recovery');
+ else{
+  const log=getJSON('mp_missed_workouts',[]);
+  log.push({date:new Date().toISOString(),day:todayName(),choice:c});
+  setJSON('mp_missed_workouts',log);
+  alert(c==='MOVE'?'Recorded. Do not stack it if tomorrow already has a demanding session.':'Recorded.');
+ }
+}
+function deloadRecommendation(show=true){
+ const s=getJSON('mp_week_'+currentWeek,{});
+ const pain=Number(s.pain||0),sleep=Number(s.sleep||0),energy=Number(s.energy||0);
+ const logs=getJSON('mp_exercise_logs',[]).slice(-12);
+ const high=logs.filter(x=>Number(x.rpe)>=9).length;
+ let msg='';
+ if(pain>=5)msg='Recovery Week recommended because pain is 5/10 or higher.';
+ else if(sleep>0&&sleep<6.5)msg='Recovery Week recommended because average sleep is below 6.5 hours.';
+ else if(energy>0&&energy<=3)msg='Recovery Week recommended because energy is very low.';
+ else if(high>=4)msg='Reduced volume recommended because several recent exercise logs were RPE 9–10.';
+ if(show)alert(msg||'No automatic deload trigger is currently active. Continue monitoring pain, sleep, energy, and performance.');
+ return msg;
+}
+function showDeloadAdvice(){deloadRecommendation(true)}
+
+function parseClock(v){if(!v||!v.includes(':'))return 0;const p=v.split(':').map(Number);return p[0]*60+p[1]}
+function saveRunLog(){
+ const miles=Number(document.getElementById('runMiles').value),time=document.getElementById('runTime').value;
+ if(!miles||!parseClock(time)){alert('Enter distance and a valid time such as 24:30.');return}
+ const rows=getJSON('mp_run_logs',[]);
+ rows.push({date:document.getElementById('runDate').value||new Date().toISOString().slice(0,10),miles,time,effort:Number(document.getElementById('runEffort').value||0)});
+ setJSON('mp_run_logs',rows);renderRunSummary();alert('Run saved.');
+}
+function renderRunSummary(){
+ const el=document.getElementById('runSummary');if(!el)return;
+ const rows=getJSON('mp_run_logs',[]);
+ const recent=rows.slice(-7),miles=recent.reduce((a,b)=>a+Number(b.miles||0),0);
+ const last=rows[rows.length-1];
+ let pace='—';if(last)pace=(parseClock(last.time)/last.miles).toFixed(1)+' min/mi';
+ const prev=rows.slice(-14,-7).reduce((a,b)=>a+Number(b.miles||0),0);
+ const jump=prev>0&&miles>prev*1.1;
+ el.innerHTML=`<div class="grid"><div class="metric"><label>Recent 7 logged runs</label><strong>${miles.toFixed(1)} mi</strong></div><div class="metric"><label>Latest pace</label><strong>${pace}</strong></div><div class="metric"><label>25:00 3-mile target pace</label><strong>8.3 min/mi</strong></div></div>${jump?'<div class="commandAlert detailWarn">Mileage increased more than 10% compared with the previous seven logged runs. Do not automatically add more.</div>':''}`;
+}
+let runTimerHandle=null,runTimerPhase=0,runTimerLeft=0;
+function startRunInterval(){
+ stopRunInterval();runTimerPhase=0;runTimerLeft=60;
+ document.getElementById('runTimerStatus').textContent='RUN · 1:00';
+ runTimerHandle=setInterval(()=>{runTimerLeft--;if(runTimerLeft<=0){runTimerPhase=1-runTimerPhase;runTimerLeft=runTimerPhase?90:60}
+ document.getElementById('runTimerStatus').textContent=(runTimerPhase?'WALK':'RUN')+' · '+Math.floor(runTimerLeft/60)+':'+String(runTimerLeft%60).padStart(2,'0')},1000);
+}
+function stopRunInterval(){if(runTimerHandle)clearInterval(runTimerHandle);runTimerHandle=null;const e=document.getElementById('runTimerStatus');if(e)e.textContent='Timer stopped.'}
+
+const swimSkills=['Face in water calmly','Exhale underwater','Float without panic','Recover to standing','Comfort in deep water','Tread with relaxed breathing','Swim continuously without rushing'];
+function renderSwimConfidence(){
+ const el=document.getElementById('swimConfidence');if(!el)return;const s=getJSON('mp_swim_confidence',{});
+ el.innerHTML=swimSkills.map((x,i)=>`<div class="metric" style="margin-bottom:8px"><label>${x}</label><input id="swimSkill${i}" type="range" min="0" max="5" value="${s[i]||0}" oninput="this.nextElementSibling.textContent=this.value+'/5'"><div class="small muted">${s[i]||0}/5</div></div>`).join('');
+}
+function saveSwimConfidence(){const s={};swimSkills.forEach((_,i)=>s[i]=Number(document.getElementById('swimSkill'+i).value));setJSON('mp_swim_confidence',s);alert('Swimming confidence saved.')}
+function renderStandards(){
+ const el=document.getElementById('standardsComparison');if(!el)return;const h=progressHistory(),x=h[h.length-1]||{};
+ const rows=[['Pull-ups',+x.pullups||0,5,12,20],['Push-ups',+x.pushups||0,30,50,70],['Plank sec',+x.plank||0,120,180,240],['Swim yards',+x.swimdist||0,100,500,800],['Tread min',+x.tread||0,3,10,15],['Ruck miles',+x.ruckdist||0,2,4,6]];
+ el.innerHTML=rows.map(r=>`<div class="detailLine"><strong>${r[0]}: ${r[1]}</strong><div class="small muted">Foundation ${r[2]} · Competitive ${r[3]} · 4-year target ${r[4]} · Remaining ${Math.max(0,r[4]-r[1])}</div></div>`).join('');
+}
+function saveTestDay(){
+ const row={date:document.getElementById('testDate').value||new Date().toISOString().slice(0,10),pullups:+testPull.value||0,pushups:+testPush.value||0,plank:+testPlank.value||0,run3:testRun.value,swimdist:+testSwim.value||0,ruckdist:+testRuck.value||0,ruckwt:+testRuckWt.value||0};
+ const rows=getJSON('mp_test_days',[]);rows.push(row);setJSON('mp_test_days',rows);
+ const p=progressHistory();p.push(row);setJSON('mp_progress',p);renderAll();alert('Assessment saved together.');
+}
+function renderTestHistory(){const e=document.getElementById('testHistory');if(!e)return;const rows=getJSON('mp_test_days',[]).slice(-5).reverse();e.innerHTML=rows.length?rows.map(x=>`<div class="detailLine"><strong>${x.date}</strong><div class="small muted">${x.pullups} pull-ups · ${x.pushups} push-ups · plank ${x.plank}s · run ${x.run3||'—'}</div></div>`).join(''):'<div class="small muted">No complete assessments saved.</div>'}
+
+function savePlan(){
+ const start=planStart.value,end=planEnd.value;if(!start||!end){alert('Choose start and end dates.');return}
+ const rows=getJSON('mp_plans',[]);rows.push({start,end,mode:planMode.value,label:planLabel.value});setJSON('mp_plans',rows);renderPlans();applyPlannedMode();alert('Planned period saved.');
+}
+function getActivePlan(){const d=new Date().toISOString().slice(0,10);return getJSON('mp_plans',[]).find(x=>d>=x.start&&d<=x.end)}
+function applyPlannedMode(){const p=getActivePlan();if(p&&trainingMode!==p.mode){trainingMode=p.mode;localStorage.setItem('trainingMode',p.mode)}}
+function renderPlans(){const e=document.getElementById('planList');if(!e)return;const rows=getJSON('mp_plans',[]);e.innerHTML=rows.length?rows.map((x,i)=>`<div class="detailLine"><strong>${x.label||x.mode}</strong><div class="small muted">${x.start} to ${x.end} · ${x.mode}</div><button class="ghost" onclick="deletePlan(${i})">Delete</button></div>`).join(''):'<div class="small muted">No planned periods.</div>'}
+function deletePlan(i){const r=getJSON('mp_plans',[]);r.splice(i,1);setJSON('mp_plans',r);renderPlans()}
+
+function createCheckpoint(){
+ const rows=getJSON('mp_backup_checkpoints',[]);
+ rows.unshift({date:new Date().toISOString(),data:buildBackupSnapshot()});
+ setJSON('mp_backup_checkpoints',rows.slice(0,5));renderCheckpoints();alert('Checkpoint created.');
+}
+function renderCheckpoints(){
+ const e=document.getElementById('checkpointList');if(!e)return;const r=getJSON('mp_backup_checkpoints',[]);
+ e.innerHTML=r.length?r.map((x,i)=>`<div class="detailLine"><strong>${new Date(x.date).toLocaleString()}</strong><div><button class="secondary" onclick="restoreCheckpoint(${i})">Restore</button> <button class="ghost" onclick="deleteCheckpoint(${i})">Delete</button></div></div>`).join(''):'<div class="small muted">No checkpoints yet.</div>';
+}
+function restoreCheckpoint(i){const r=getJSON('mp_backup_checkpoints',[]);if(r[i]&&confirm('Restore this checkpoint?'))applyCloudBackup(r[i].data,false)}
+function deleteCheckpoint(i){const r=getJSON('mp_backup_checkpoints',[]);r.splice(i,1);setJSON('mp_backup_checkpoints',r);renderCheckpoints()}
+
+function saveReminder(){setJSON('mp_reminder',{time:reminderTime.value,enabled:reminderEnabled.value});alert('Reminder preference saved. It appears inside the app when opened near that time.')}
+function saveReflection(){setJSON('mp_reflection',{week:currentWeek,text:weeklyReflection.value,date:new Date().toISOString()});alert('Reflection saved.')}
+function loadReminderReflection(){
+ const r=getJSON('mp_reminder',{});if(document.getElementById('reminderTime')){reminderTime.value=r.time||'';reminderEnabled.value=r.enabled||'yes'}
+ const f=getJSON('mp_reflection',{});if(document.getElementById('weeklyReflection'))weeklyReflection.value=f.week===currentWeek?(f.text||''):'';
+ if(r.enabled==='yes'&&r.time){const now=new Date(),cur=now.getHours()*60+now.getMinutes(),p=r.time.split(':').map(Number),set=p[0]*60+p[1];if(Math.abs(cur-set)<=30&&!completionForToday())setCloudStatus('Workout reminder: today’s session is not marked complete.','busy')}
+}
+function searchNotes(){
+ const q=notesSearch.value.toLowerCase();const e=document.getElementById('notesResults');if(!q){e.innerHTML='';return}
+ const rows=[];for(let w=1;w<=52;w++){const s=getJSON('mp_week_'+w,{});if((s.notes||'').toLowerCase().includes(q))rows.push({w,n:s.notes})}
+ e.innerHTML=rows.length?rows.map(x=>`<div class="detailLine"><strong>Week ${x.w}</strong><div class="small muted">${x.n}</div></div>`).join(''):'<div class="small muted">No matching notes.</div>';
+}
+function saveSubstitution(){if(!subFrom.value||!subTo.value)return alert('Enter both exercises.');const r=getJSON('mp_substitutions',{});r[subFrom.value.trim()]=subTo.value.trim();setJSON('mp_substitutions',r);subFrom.value=subTo.value='';renderSubstitutions()}
+function renderSubstitutions(){const e=document.getElementById('substitutionList');if(!e)return;const r=getJSON('mp_substitutions',{});e.innerHTML=Object.keys(r).length?Object.entries(r).map(([a,b])=>`<div class="detailLine"><strong>${a}</strong><div class="small muted">Use ${b}</div></div>`).join(''):'<div class="small muted">No personal substitutions saved.</div>'}
+function toggleTheme(){document.body.classList.toggle('light');localStorage.setItem('mp_theme',document.body.classList.contains('light')?'light':'dark')}
+
+function photoDB(){return new Promise((res,rej)=>{const q=indexedDB.open('marinePrepPhotos',1);q.onupgradeneeded=()=>q.result.createObjectStore('photos',{keyPath:'id',autoIncrement:true});q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function saveProgressPhoto(){const f=progressPhoto.files[0];if(!f)return alert('Choose a photo.');const db=await photoDB();const tx=db.transaction('photos','readwrite');tx.objectStore('photos').add({date:new Date().toISOString(),blob:f});tx.oncomplete=()=>{progressPhoto.value='';renderPhotos();alert('Photo saved only on this device.')}}
+async function renderPhotos(){const e=document.getElementById('photoGallery');if(!e||!window.indexedDB)return;try{const db=await photoDB();const q=db.transaction('photos').objectStore('photos').getAll();q.onsuccess=()=>{e.innerHTML=q.result.slice(-6).reverse().map(x=>`<div><img src="${URL.createObjectURL(x.blob)}"><div class="small muted">${new Date(x.date).toLocaleDateString()}</div></div>`).join('')}}catch{}}
+
+function trainingModeLabel(){return DATA.trainingModes[trainingMode]?.label||'Normal week'}
+
 function renderAll(){
+ applyPlannedMode();
+ if(localStorage.getItem('mp_theme')==='light')document.body.classList.add('light');
  document.querySelectorAll('.modeSelect').forEach(s=>s.value=trainingMode);
  renderWeek();renderDashboard();renderStrengthLibrary();renderCalendar();renderSwimGates();renderSupplements();if(!document.getElementById('stats').classList.contains('hidden'))renderStats()
+ renderCommandCenter();
+}
+if(localStorage.getItem('mp_last_version')!==APP_VERSION){
+ const prior=localStorage.getItem('mp_last_version');
+ if(prior){
+  const rows=getJSON('mp_backup_checkpoints',[]);
+  rows.unshift({date:new Date().toISOString(),label:'Before update to '+APP_VERSION,data:buildBackupSnapshot()});
+  nativeStorageSetItem.call(localStorage,'mp_backup_checkpoints',JSON.stringify(rows.slice(0,5)));
+ }
+ nativeStorageSetItem.call(localStorage,'mp_last_version',APP_VERSION);
 }
 renderAll();drawChart();initCloudSync();if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=46').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=51').then(reg=>reg.update()).catch(console.error);
 }

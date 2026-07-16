@@ -89,3 +89,18 @@ Version 4.6:
 - Categories only gain readiness from saved evidence for that category.
 - No starting bonus or assumed readiness is awarded.
 - Monday and other completed workouts remain user data and are expected to restore through cloud sync after updating.
+
+Version 5.1 major feature release:
+- Expanded Today dashboard and minimum viable workout.
+- Missed-workout handling.
+- Pain-location tracking and conservative recovery safeguards.
+- Running log, pace/mileage summaries, growth warning, and run/walk timer.
+- Swimming confidence tracker.
+- Marine benchmark comparison.
+- Guided complete test-day records.
+- Calendar/travel training-mode planning.
+- Five-entry backup/checkpoint history, including pre-update checkpoints.
+- In-app reminders and weekly reflection.
+- Notes search and personal exercise substitutions.
+- On-device-only progress photo storage using IndexedDB.
+- Light/dark appearance control.

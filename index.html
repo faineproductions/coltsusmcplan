@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Marine Prep Pro v4.6</title>
-<link rel="manifest" href="manifest.json?v=46">
+<title>Marine Prep Pro v5.1</title>
+<link rel="manifest" href="manifest.json?v=51">
 <style>
 :root{--bg:#07111f;--panel:#0e1b2e;--panel2:#13243a;--line:#243a56;--text:#f3f7fc;--muted:#9db0c8;--green:#4ade80;--yellow:#fbbf24;--red:#fb7185;--blue:#60a5fa;--safe:env(safe-area-inset-bottom)}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#06101d,#0a1525 45%,#07111f);color:var(--text);min-height:100vh}
@@ -74,10 +74,17 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 .syncDot.busy{background:var(--yellow);box-shadow:0 0 0 4px rgba(251,191,36,.14)}
 .syncDot.error{background:var(--red);box-shadow:0 0 0 4px rgba(251,113,133,.14)}
 
+
+body.light{--bg:#eef3f8;--panel:#fff;--panel2:#f3f6fa;--text:#122033;--muted:#58687b;--line:#ccd7e3}
+body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
+.photoGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.photoGrid img{width:100%;height:160px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
+.commandAlert{padding:10px;border:1px solid var(--line);border-radius:12px;margin-top:8px}
+
 </style>
 </head>
 <body>
-<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v4.6</span></h1><span class="badge">YEAR 1</span></div></div>
+<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v5.1</span></h1><span class="badge">YEAR 1</span></div></div>
 <main>
 <section id="dashboard">
  <div class="card hero">
@@ -189,6 +196,7 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
   <div class="metric"><label>Sleep average</label><input id="sleep" type="number" step=".1"></div>
   <div class="metric"><label>Energy 1–10</label><input id="energy" type="number" min="1" max="10"></div>
   <div class="metric"><label>Pain 0–10</label><input id="pain" type="number" min="0" max="10"></div>
+  <div class="metric"><label>Pain location</label><select id="painLocation"><option value="">None selected</option><option>Knees</option><option>Ankles</option><option>Shins</option><option>Back</option><option>Shoulders</option><option>Feet</option><option>Other</option></select></div>
   <div class="metric"><label>Body weight</label><input id="weight" type="number" step=".1"></div>
  </div><label class="small muted" style="display:block;margin:12px 0 6px">Notes</label><textarea id="notes" rows="4"></textarea><button style="margin-top:10px" onclick="saveCheckin()">Save check-in</button></div>
 </section>
@@ -231,6 +239,114 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
  <div class="card"><h3>Swimming gates</h3><p class="muted small">Swimming advances independently from the rest of the program.</p><div id="swimGates"></div></div>
  <div class="card"><h3>Supplements</h3><div id="supplements"></div><div class="notice small" style="margin-top:12px">Because you use a GLP-1, review supplements and major increases in training with the clinician managing it.</div></div>
 </section>
+
+<section id="command" class="hidden">
+ <div class="card hero">
+  <div class="row between"><div><h2>Command center</h2><p class="muted small">Planning, assessment, recovery, running, swimming, reminders, records, and personalization.</p></div><button class="ghost" onclick="toggleTheme()">Appearance</button></div>
+ </div>
+
+ <div class="card">
+  <div class="row between"><h3>Today dashboard</h3><button onclick="minimumWorkout()">Minimum workout</button></div>
+  <div id="commandToday"></div>
+  <div class="grid" style="margin-top:10px">
+   <button class="secondary" onclick="missedWorkout()">Handle missed workout</button>
+   <button class="secondary" onclick="showDeloadAdvice()">Recovery recommendation</button>
+  </div>
+ </div>
+
+ <div class="card">
+  <h3>Running progression</h3>
+  <div class="grid">
+   <div class="metric"><label>Date</label><input id="runDate" type="date"></div>
+   <div class="metric"><label>Distance (miles)</label><input id="runMiles" type="number" step=".01"></div>
+   <div class="metric"><label>Time</label><input id="runTime" placeholder="24:30"></div>
+   <div class="metric"><label>Effort 1–10</label><input id="runEffort" type="number" min="1" max="10"></div>
+  </div>
+  <button style="margin-top:10px" onclick="saveRunLog()">Save run</button>
+  <div id="runSummary" style="margin-top:12px"></div>
+  <div class="row" style="margin-top:10px"><button class="secondary" onclick="startRunInterval()">Run/walk timer</button><button class="ghost" onclick="stopRunInterval()">Stop timer</button></div>
+  <div id="runTimerStatus" class="small muted" style="margin-top:8px"></div>
+ </div>
+
+ <div class="card">
+  <h3>Swimming confidence</h3>
+  <div id="swimConfidence"></div>
+  <button style="margin-top:10px" onclick="saveSwimConfidence()">Save confidence check</button>
+ </div>
+
+ <div class="card">
+  <h3>Marine benchmark comparison</h3>
+  <div id="standardsComparison"></div>
+  <div class="notice small" style="margin-top:10px">Planning comparison only. This is not an official enlistment, medical, PFT, or CFT determination.</div>
+ </div>
+
+ <div class="card">
+  <h3>Test-day mode</h3>
+  <div class="grid">
+   <div class="metric"><label>Date</label><input id="testDate" type="date"></div>
+   <div class="metric"><label>Pull-ups</label><input id="testPull" type="number"></div>
+   <div class="metric"><label>Push-ups</label><input id="testPush" type="number"></div>
+   <div class="metric"><label>Plank seconds</label><input id="testPlank" type="number"></div>
+   <div class="metric"><label>3-mile time</label><input id="testRun" placeholder="30:00"></div>
+   <div class="metric"><label>Swim yards</label><input id="testSwim" type="number"></div>
+   <div class="metric"><label>Ruck miles</label><input id="testRuck" type="number" step=".1"></div>
+   <div class="metric"><label>Ruck load</label><input id="testRuckWt" type="number"></div>
+  </div>
+  <button style="margin-top:10px" onclick="saveTestDay()">Save complete assessment</button>
+  <div id="testHistory" style="margin-top:10px"></div>
+ </div>
+
+ <div class="card">
+  <h3>Calendar and travel planning</h3>
+  <div class="grid">
+   <div class="metric"><label>Start date</label><input id="planStart" type="date"></div>
+   <div class="metric"><label>End date</label><input id="planEnd" type="date"></div>
+   <div class="metric"><label>Mode</label><select id="planMode"><option value="finals">Finals</option><option value="hotel">Hotel</option><option value="equipmentless">Equipmentless</option><option value="recovery">Recovery</option><option value="swimfocus">Swimming focus</option><option value="precollege">Pre-college</option></select></div>
+   <div class="metric"><label>Label</label><input id="planLabel" placeholder="Family trip"></div>
+  </div>
+  <button style="margin-top:10px" onclick="savePlan()">Add planned period</button>
+  <div id="planList" style="margin-top:10px"></div>
+ </div>
+
+ <div class="card">
+  <h3>Backup history</h3>
+  <div class="row"><button onclick="createCheckpoint()">Create checkpoint</button><button class="secondary" onclick="renderCheckpoints()">Refresh list</button></div>
+  <div id="checkpointList" style="margin-top:10px"></div>
+ </div>
+
+ <div class="card">
+  <h3>Reminders and weekly reflection</h3>
+  <div class="grid">
+   <div class="metric"><label>Workout reminder</label><input id="reminderTime" type="time"></div>
+   <div class="metric"><label>Reminder enabled</label><select id="reminderEnabled"><option value="yes">Yes</option><option value="no">No</option></select></div>
+  </div>
+  <button style="margin-top:10px" onclick="saveReminder()">Save reminder</button>
+  <label class="small muted" style="display:block;margin-top:12px">Weekly reflection</label>
+  <textarea id="weeklyReflection" rows="4" placeholder="What improved? What was difficult? What changes next week?"></textarea>
+  <button style="margin-top:10px" onclick="saveReflection()">Save reflection</button>
+ </div>
+
+ <div class="card">
+  <h3>Notes search and substitutions</h3>
+  <input id="notesSearch" placeholder="Search weekly notes" oninput="searchNotes()">
+  <div id="notesResults" style="margin-top:10px"></div>
+  <div class="grid" style="margin-top:12px">
+   <div class="metric"><label>Exercise</label><input id="subFrom" placeholder="Back squat"></div>
+   <div class="metric"><label>Use instead</label><input id="subTo" placeholder="Goblet squat"></div>
+  </div>
+  <button style="margin-top:10px" onclick="saveSubstitution()">Save substitution</button>
+  <div id="substitutionList" style="margin-top:10px"></div>
+ </div>
+
+ <div class="card">
+  <h3>Progress photos</h3>
+  <p class="small muted">Stored only on this device in the browser database. They are not included in cloud backup.</p>
+  <input id="progressPhoto" type="file" accept="image/*">
+  <button style="margin-top:10px" onclick="saveProgressPhoto()">Save photo on device</button>
+  <div id="photoGallery" class="photoGrid" style="margin-top:10px"></div>
+ </div>
+</section>
+
 </main>
 
 <div class="nav">
@@ -240,6 +356,7 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 <button data-tab="calendar" onclick="switchTab('calendar')"><span class="icon">▦</span>Calendar</button>
 <button data-tab="stats" onclick="switchTab('stats')"><span class="icon">◎</span>Stats</button>
 <button data-tab="progress" onclick="switchTab('progress')"><span class="icon">↗</span>Log</button>
+<button data-tab="command" onclick="switchTab('command')"><span class="icon">★</span>Command</button>
 </div>
 
 <div id="demoModal" class="modal hidden" onclick="closeOnBackdrop(event,'demoModal')"><div class="sheet">
@@ -334,5 +451,5 @@ canvas{width:100%;height:230px;background:#0a1728;border-radius:13px}.notice{bor
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=46"></script>
+<script src="app.js?v=51"></script>
 </body></html>
