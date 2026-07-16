@@ -104,3 +104,10 @@ Version 5.1 major feature release:
 - Notes search and personal exercise substitutions.
 - On-device-only progress photo storage using IndexedDB.
 - Light/dark appearance control.
+
+Version 5.2:
+- Combined Progress Log and Command into one Tools & Progress area.
+- Added a three-line slide-out menu in the upper-right corner.
+- Kept the bottom bar for frequently used daily sections.
+- Added menu shortcuts for Tools & Progress, Statistics, Appearance, and Cloud Backup.
+- Preserved old Log and Command navigation calls for compatibility.

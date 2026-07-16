@@ -7,7 +7,7 @@ let activeExerciseLogName=null;
 let trainingMode=localStorage.getItem('trainingMode')||'normal';
 
 
-const APP_VERSION='5.1';
+const APP_VERSION='5.2';
 const SUPABASE_URL='https://ewzmwoepcukxxeabimsy.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_itOe_-3RBRY_6rlZ60LRWw_B02V7f3T';
 
@@ -334,11 +334,58 @@ const sel=document.getElementById('weekSelect');
 for(let i=1;i<=52;i++){let o=document.createElement('option');o.value=i;o.textContent='Week '+i;sel.appendChild(o)}sel.value=currentWeek;
 sel.onchange=()=>{currentWeek=Number(sel.value);localStorage.setItem('currentWeek',currentWeek);renderAll()};
 
+
+let activeToolPanel='progress';
+
+function toggleAppMenu(event){
+ if(event)event.stopPropagation();
+ const menu=document.getElementById('appMenu');
+ const backdrop=document.getElementById('appMenuBackdrop');
+ if(!menu||!backdrop)return;
+ const opening=menu.classList.contains('hidden');
+ menu.classList.toggle('hidden',!opening);
+ backdrop.classList.toggle('hidden',!opening);
+ document.body.style.overflow=opening?'hidden':'';
+}
+function closeAppMenu(){
+ document.getElementById('appMenu')?.classList.add('hidden');
+ document.getElementById('appMenuBackdrop')?.classList.add('hidden');
+ document.body.style.overflow='';
+}
+function showToolPanel(panel){
+ activeToolPanel=panel==='command'?'command':'progress';
+ document.getElementById('toolPanelProgress')?.classList.toggle('hidden',activeToolPanel!=='progress');
+ document.getElementById('toolPanelCommand')?.classList.toggle('hidden',activeToolPanel!=='command');
+ document.getElementById('toolTabProgress')?.classList.toggle('active',activeToolPanel==='progress');
+ document.getElementById('toolTabCommand')?.classList.toggle('active',activeToolPanel==='command');
+ if(activeToolPanel==='command')renderCommandCenter();
+}
+function openTools(panel='progress'){
+ closeAppMenu();
+ switchTab('tools');
+ showToolPanel(panel);
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function scrollToCloudBackup(){
+ closeAppMenu();
+ switchTab('dashboard');
+ setTimeout(()=>{
+  const title=[...document.querySelectorAll('h3')].find(x=>x.textContent.trim()==='Cloud backup');
+  title?.closest('.card')?.scrollIntoView({behavior:'smooth',block:'start'});
+ },120);
+}
+
 function switchTab(id){
+ if(id==='progress'){openTools('progress');return}
+ if(id==='command'){openTools('command');return}
  document.querySelectorAll('main>section').forEach(s=>s.classList.add('hidden'));
- document.getElementById(id).classList.remove('hidden');
+ const target=document.getElementById(id);
+ if(target)target.classList.remove('hidden');
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));
- if(id==='calendar')renderCalendar(); if(id==='progress')drawChart(); if(id==='strength')renderStrengthLibrary(); if(id==='stats')renderStats();
+ if(id==='calendar')renderCalendar();
+ if(id==='strength')renderStrengthLibrary();
+ if(id==='stats')renderStats();
+ if(id==='tools'){showToolPanel(activeToolPanel);renderCommandCenter();drawChart()}
 }
 function pctForWeek(w){
  if(trainingMode!=='normal' && w!==currentWeek){
@@ -1122,5 +1169,5 @@ if(localStorage.getItem('mp_last_version')!==APP_VERSION){
  nativeStorageSetItem.call(localStorage,'mp_last_version',APP_VERSION);
 }
 renderAll();drawChart();initCloudSync();if('serviceWorker'in navigator){
- navigator.serviceWorker.register('sw.js?v=51').then(reg=>reg.update()).catch(console.error);
+ navigator.serviceWorker.register('sw.js?v=52').then(reg=>reg.update()).catch(console.error);
 }

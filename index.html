@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Marine Prep Pro v5.1</title>
-<link rel="manifest" href="manifest.json?v=51">
+<title>Marine Prep Pro v5.2</title>
+<link rel="manifest" href="manifest.json?v=52">
 <style>
 :root{--bg:#07111f;--panel:#0e1b2e;--panel2:#13243a;--line:#243a56;--text:#f3f7fc;--muted:#9db0c8;--green:#4ade80;--yellow:#fbbf24;--red:#fb7185;--blue:#60a5fa;--safe:env(safe-area-inset-bottom)}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#06101d,#0a1525 45%,#07111f);color:var(--text);min-height:100vh}
@@ -81,10 +81,37 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
 .photoGrid img{width:100%;height:160px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
 .commandAlert{padding:10px;border:1px solid var(--line);border-radius:12px;margin-top:8px}
 
+
+.menuButton{width:42px;height:42px;padding:9px;display:flex;flex-direction:column;justify-content:center;gap:5px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.menuButton span{display:block;width:100%;height:2px;border-radius:2px;background:var(--text)}
+.menuBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:89}
+.appMenu{position:fixed;top:0;right:0;bottom:0;width:min(88vw,360px);padding:20px;background:var(--panel);border-left:1px solid var(--line);z-index:90;overflow:auto;box-shadow:-12px 0 30px rgba(0,0,0,.28)}
+.menuItem{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;margin-top:12px;padding:14px;background:var(--panel2);border:1px solid var(--line);border-radius:14px}
+.menuItem span{font-size:.8rem;color:var(--muted);margin-top:4px}
+.toolTabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.toolTabs button{background:var(--panel2);border:1px solid var(--line)}
+.toolTabs button.active{background:var(--accent);color:white;border-color:var(--accent)}
+
 </style>
 </head>
 <body>
-<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v5.1</span></h1><span class="badge">YEAR 1</span></div></div>
+<div class="top"><div class="brand"><h1>Marine Prep Pro <span class="versionMark">v5.2</span></h1><span class="badge">YEAR 1</span>
+<button class="menuButton" aria-label="Open menu" onclick="toggleAppMenu(event)">
+ <span></span><span></span><span></span>
+</button></div></div>
+
+<div id="appMenuBackdrop" class="menuBackdrop hidden" onclick="closeAppMenu()"></div>
+<aside id="appMenu" class="appMenu hidden">
+ <div class="row between">
+  <div><h3>Marine Prep</h3><div class="small muted">Quick menu</div></div>
+  <button class="ghost" onclick="closeAppMenu()">Close</button>
+ </div>
+ <button class="menuItem" onclick="openTools('progress')"><strong>Tools & Progress</strong><span>Logs, tests, planning, recovery, and more</span></button>
+ <button class="menuItem" onclick="switchTab('stats');closeAppMenu()"><strong>Statistics</strong><span>Readiness and progress charts</span></button>
+ <button class="menuItem" onclick="toggleTheme();closeAppMenu()"><strong>Appearance</strong><span>Switch light or dark mode</span></button>
+ <button class="menuItem" onclick="scrollToCloudBackup()"><strong>Cloud backup</strong><span>Account, sync, and restore controls</span></button>
+</aside>
+
 <main>
 <section id="dashboard">
  <div class="card hero">
@@ -224,7 +251,19 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
  <div class="card"><h3>Readiness history</h3><canvas id="readinessChart" width="700" height="250"></canvas></div>
 </section>
 
-<section id="progress" class="hidden">
+
+<section id="tools" class="hidden">
+ <div class="card hero">
+  <div class="row between">
+   <div><h2>Tools & Progress</h2><p class="small muted">Logs, assessments, planning, recovery, records, and personalization.</p></div>
+   <button class="ghost" onclick="toggleAppMenu(event)">Menu</button>
+  </div>
+  <div class="toolTabs">
+   <button id="toolTabProgress" class="active" onclick="showToolPanel('progress')">Progress log</button>
+   <button id="toolTabCommand" onclick="showToolPanel('command')">Command tools</button>
+  </div>
+ </div>
+ <div id="toolPanelProgress"> class="hidden">
  <div class="card"><h2>Progress log</h2><div class="grid">
   <div class="metric"><label>Push-ups</label><input id="pushups" type="number"></div>
   <div class="metric"><label>Pull-ups</label><input id="pullups" type="number"></div>
@@ -238,12 +277,9 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
  <div class="card"><h3>Progress chart</h3><select id="chartMetric" onchange="drawChart()"><option value="pushups">Push-ups</option><option value="pullups">Pull-ups</option><option value="plank">Plank</option><option value="swimdist">Swim distance</option><option value="tread">Treading</option><option value="ruckdist">Ruck distance</option><option value="ruckwt">Ruck weight</option></select><canvas id="chart" width="700" height="250"></canvas></div>
  <div class="card"><h3>Swimming gates</h3><p class="muted small">Swimming advances independently from the rest of the program.</p><div id="swimGates"></div></div>
  <div class="card"><h3>Supplements</h3><div id="supplements"></div><div class="notice small" style="margin-top:12px">Because you use a GLP-1, review supplements and major increases in training with the clinician managing it.</div></div>
-</section>
-
-<section id="command" class="hidden">
- <div class="card hero">
-  <div class="row between"><div><h2>Command center</h2><p class="muted small">Planning, assessment, recovery, running, swimming, reminders, records, and personalization.</p></div><button class="ghost" onclick="toggleTheme()">Appearance</button></div>
- </div>
+</div>
+ <div id="toolPanelCommand" class="hidden"> class="hidden">
+ 
 
  <div class="card">
   <div class="row between"><h3>Today dashboard</h3><button onclick="minimumWorkout()">Minimum workout</button></div>
@@ -345,7 +381,9 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
   <button style="margin-top:10px" onclick="saveProgressPhoto()">Save photo on device</button>
   <div id="photoGallery" class="photoGrid" style="margin-top:10px"></div>
  </div>
+</div>
 </section>
+
 
 </main>
 
@@ -355,8 +393,6 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
 <button data-tab="strength" onclick="switchTab('strength')"><span class="icon">▤</span>Strength</button>
 <button data-tab="calendar" onclick="switchTab('calendar')"><span class="icon">▦</span>Calendar</button>
 <button data-tab="stats" onclick="switchTab('stats')"><span class="icon">◎</span>Stats</button>
-<button data-tab="progress" onclick="switchTab('progress')"><span class="icon">↗</span>Log</button>
-<button data-tab="command" onclick="switchTab('command')"><span class="icon">★</span>Command</button>
 </div>
 
 <div id="demoModal" class="modal hidden" onclick="closeOnBackdrop(event,'demoModal')"><div class="sheet">
@@ -451,5 +487,5 @@ body.light .top,body.light .nav{background:rgba(255,255,255,.96)}
 <div id="timerModal" class="modal hidden" onclick="closeOnBackdrop(event,'timerModal')"><div class="sheet"><div class="row between"><h2>Workout timer</h2><button class="ghost" onclick="closeModal('timerModal')">Close</button></div><div class="timer" id="timerText">00:00</div><div class="timerBtns"><button onclick="timerStart()">Start</button><button class="secondary" onclick="timerPause()">Pause</button><button class="warn" onclick="timerReset()">Reset</button></div><div class="grid" style="margin-top:14px"><button class="ghost" onclick="setTimer(30)">30 sec</button><button class="ghost" onclick="setTimer(60)">1 min</button><button class="ghost" onclick="setTimer(90)">90 sec</button><button class="ghost" onclick="setTimer(120)">2 min</button><button class="ghost" onclick="setTimer(300)">5 min</button><button class="ghost" onclick="setTimer(600)">10 min</button></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=51"></script>
+<script src="app.js?v=52"></script>
 </body></html>
